@@ -24,8 +24,9 @@ struct device_info {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
+    struct epoll_entry* entry;
     size_t random_id;
-    int dev_fd;
+    int fd;
 };
 
 int e_init_device(struct epoll_context* ep_ctx, device_info_arr* devices, const char *dev_path, struct device_info* out_dev);

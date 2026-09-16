@@ -158,19 +158,35 @@ err:
 }
 
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
+    if (type == FD_DEV)
+        DO_GOTO(fprintf(stderr, "type FD_DEV invalid for normal d_epoll_add\n"), err);
     struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
     entry->type = type;
     entry->fd = fd;
+    entry->device = NULL;
     CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
-    struct epoll_event u_evt = {
-        .events = EPOLLIN,
-        .data.ptr = entry,
-    };
-    TRY(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt), -1);
+    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry, };
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
     CHECK(update_epoll_counter(ep_ctx, type, 1) == -1);
     return 0;
 err:
     ERR_LOG("d_epoll_add");
+    return -1;
+}
+
+int d_epoll_add_device(struct epoll_context* ep_ctx, struct device_info* dev) {
+    struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
+    entry->type = FD_DEV;
+    entry->fd = dev->fd;
+    entry->device = dev;
+    dev->entry = entry;
+    CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
+    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry };
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, entry->fd, &u_evt) == -1);
+    CHECK(update_epoll_counter(ep_ctx, FD_DEV, 1) == -1);
+    return 0;
+err:
+    ERR_LOG("d_epoll_add_device");
     return -1;
 }
 
@@ -207,10 +223,12 @@ int d_sock_msg(struct d_handler_context* h_ctx, enum d_msg_source source, enum p
     for (size_t i = 0; i < h_ctx->ep_ctx->entries.r.length; i++) {
         struct epoll_entry* entry = {};
         CHECK(u_array_getv(&h_ctx->ep_ctx->entries.r, (void**)&entry, i) == -1);
-        if (entry->type == FD_RELAY)
+        if (entry->type == FD_RELAY) {
             CHECK(d_write_relay(entry->fd, RELAY_MSG_STOP) == -1);
-        else if (entry->type == FD_PEER && source == SRC_RELAY)
-            CHECK(d_write_peer(entry->fd, peer_msg, (union peer_msg_data)0) == -1);
+        } else if (entry->type == FD_PEER && source == SRC_RELAY) {
+            const union peer_msg_data data = {0};
+            CHECK(d_write_peer(entry->fd, peer_msg, data) == -1);
+        }
     }
     return 0;
 err:
@@ -255,7 +273,7 @@ int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop
                     break;
                 }
                 case FD_DEV: {
-                    CHECK(handlers.device(&h_ctx, entry, ));
+                    CHECK(handlers.device(&h_ctx, entry));
                     break;
                 }
                 default: goto err;
@@ -273,7 +291,7 @@ int cleanup(struct daemon_arg* d_arg) {
     for (size_t i = 0; i < devices->r.length; i++) {
         struct device_info dev = { 0 };
         CHECK(u_array_getv(&devices->r, &dev, i) == -1);
-        CHECK(close(dev.dev_fd) == -1);
+        CHECK(close(dev.entry->fd) == -1);
     }
     CHECK(u_array_free(&d_arg->devices->r) == -1);
     CHECK(u_array_free(&d_arg->ep_ctx->entries.r) == -1);

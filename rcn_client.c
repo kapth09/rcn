@@ -1,6 +1,5 @@
 #include "include/rcn.h"
 #include "include/rcn_daemon.h"
-#include "include/rcn_evdev.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -69,8 +68,13 @@ err:
 }
 
 static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
-    (void) entry;
-    (void) h_ctx;
+    CHECK(entry->device != NULL);
+    struct input_event i_evt = { 0 };
+    CHECK(read(entry->fd, &i_evt, sizeof(i_evt)) == -1);
+    union peer_msg_data data;
+    data.event.evt_data = i_evt;
+    data.event.random_id = entry->device->random_id;
+    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
     return 0;
 err:
     ERR_LOG("handler_device");

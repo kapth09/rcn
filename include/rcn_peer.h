@@ -21,7 +21,6 @@ struct peer_msg_event {
 union peer_msg_data {
     struct device_info dev_info;
     struct peer_msg_event event;
-    int status;
 };
 
 struct peer_msg {

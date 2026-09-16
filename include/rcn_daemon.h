@@ -17,14 +17,13 @@ struct d_handler_context {
     bool exit;
 };
 
-typedef typeof(int(struct d_handler_context* handler_ctx, struct epoll_entry* entry, struct device_info* device)) * dev_handler_t;
 typedef typeof(int(struct d_handler_context* handler_ctx, struct epoll_entry* entry)) * fd_handler_t;
 typedef typeof(int(struct d_handler_context* handler_ctx)) *exit_handler_t;
 
 struct d_loop_handlers {
     fd_handler_t relay;
     fd_handler_t peer;
-    dev_handler_t device;
+    fd_handler_t device;
 };
 
 struct daemon_arg {
@@ -43,6 +42,7 @@ int d_init_log(enum daemon_type d_type);
 int d_init_usock(char* sock_path, size_t path_len);
 int d_init_epoll(struct epoll_context* ep_ctx);
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type);
+int d_epoll_add_device(struct epoll_context* ep_ctx, struct device_info* dev);
 int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_entry* entry);
 int d_fork(struct daemon_arg* d_arg, r_handler_t r_handler, struct relay_arg r_arg);
 int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers);

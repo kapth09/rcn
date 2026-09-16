@@ -23,16 +23,28 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_handler_context* h_ctx, struct epoll_entry* entry) {
+static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+    // data is never read from uinput devices, so this function is empty
     (void) entry;
     (void) h_ctx;
     return 0;
+}
+
+static int emit_event(device_info_arr *devices, struct peer_msg_event event) {
+    struct device_info *dev = NULL;
+    for (size_t i = 0; i < devices->r.length; i++) {
+        CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
+        if (dev->random_id == event.random_id)
+            break;
+    }
+    CHECK(dev == NULL);
+    CHECK(write(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
+    return 0;
 err:
-    ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_handler_context* h_ctx, struct epoll_entry* entry) {
+static int handler_peer(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
     struct peer_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -55,6 +67,7 @@ static int handler_peer(struct d_handler_context* h_ctx, struct epoll_entry* ent
         }
         case PEER_MSG_EVT: {
             printf("server: peer evt\n");
+            CHECK(emit_event(h_ctx->devices, msg.data.event) == -1);
             break;
         }
         case PEER_MSG_DEV_CRT: {
@@ -74,7 +87,7 @@ err:
     return -1;
 }
 
-static int handler_relay(struct d_handler_context* h_ctx, struct  epoll_entry* entry) {
+static int handler_relay(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
     struct relay_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -101,7 +114,7 @@ static int handler_relay(struct d_handler_context* h_ctx, struct  epoll_entry* e
             CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_STOP) == -1);
             break;
         }
-        case RELAY_MSG_CONTINUE:    // do nothing, fall through
+        case RELAY_MSG_CONTINUE: // do nothing, fall through
         default: break;
     }
     return 0;
