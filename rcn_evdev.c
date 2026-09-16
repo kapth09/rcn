@@ -8,6 +8,8 @@
 #include <sys/random.h>
 
 static int has_active_key(int dev_fd) {
+    if (dev_fd <= 0)
+        DO_GOTO(fprintf(stderr, "err: dev_fd is <= 0\n"), err);
     uint8_t keybits[MAX_KEY_BYTES] = { 0 };
     CHECK(ioctl(dev_fd, EVIOCGKEY(sizeof(keybits)), keybits) == -1);
     for (int i = 0; i < (int)sizeof(keybits); i++) {
@@ -44,10 +46,10 @@ err:
     return -1;
 }
 
-static int find_device(struct u_array* devices, struct device_info* out_device, size_t random_it) {
+static int find_device(struct u_array* devices, struct device_info** out_device, size_t random_it) {
     for (size_t i = 0; i < devices->length; i++) {
-        CHECK(u_array_getr(devices, (void**)&out_device, i) == -1);
-        if (out_device->random_id == random_it) {
+        CHECK(u_array_getr(devices, (void**)out_device, i) == -1);
+        if ((*out_device)->random_id== random_it) {
             return 0;
         }
     }
@@ -59,7 +61,6 @@ err:
 
 int e_init_device(struct epoll_context* ep_ctx, device_info_arr* devices, const char *dev_path, struct device_info* out_dev) {
     int dev_fd = TRY(open(dev_path, O_RDONLY | O_NONBLOCK), -1);
-    out_dev->fd = dev_fd;
     CHECK(e_get_device_info(dev_fd, out_dev) == -1);
     CHECK(u_array_add(&devices->r, out_dev) == -1);
     CHECK(d_epoll_add_device(ep_ctx, out_dev) == -1);
@@ -71,10 +72,10 @@ err:
 }
 
 int e_grab_device_by_id(device_info_arr* devices, size_t random_id, bool grab) {
-    struct device_info dev = { 0 };
+    struct device_info* dev;
     CHECK(find_device(&devices->r, &dev,random_id) == -1);
-    CHECK(drain_events(&dev) == -1);
-    CHECK(ioctl(dev.entry->fd, EVIOCGRAB, &grab) == -1);
+    CHECK(drain_events(dev) == -1);
+    // CHECK(ioctl(dev.entry->fd, EVIOCGRAB, &grab) == -1);
     return 0;
 err:
     ERR_LOG("grab_dev_by_id");
@@ -83,7 +84,7 @@ err:
 
 int e_grab_device_by_ptr(struct device_info* dev, bool grab) {
     CHECK(drain_events(dev) == -1);
-    CHECK(ioctl(dev->entry->fd, EVIOCGRAB, &grab) == -1);
+    // CHECK(ioctl(dev->entry->fd, EVIOCGRAB, &grab) == -1);
     return 0;
 err:
     ERR_LOG("grab_dev_by_ptr");
@@ -92,6 +93,7 @@ err:
 
 int e_get_device_info(int dev_fd, struct device_info* dev) {
     memset(dev, 0, sizeof(struct device_info));
+    dev->fd = dev_fd;
     CHECK(getrandom(&dev->random_id, sizeof(dev->random_id), 0) == -1);
     CHECK(ioctl(dev_fd, EVIOCGID, &dev->dev_id) == -1);
     CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(dev->name)-1), dev->name) == -1);
@@ -155,7 +157,7 @@ int e_create_udev(struct epoll_context* ep_ctx, device_info_arr* devices, struct
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
     CHECK(u_array_add(&devices->r, new_dev) == -1);
-    CHECK(d_epoll_add_device(ep_ctx, new_dev) == -1);
+    // CHECK(d_epoll_add_device(ep_ctx, new_dev) == -1);
     return 0;
 err:
     if (u_fd != -1)

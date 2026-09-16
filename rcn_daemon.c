@@ -246,8 +246,8 @@ static int can_exit(struct d_handler_context* h_ctx) {
     return 1;
 }
 
-int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers) {
-    struct d_handler_context h_ctx = { .ep_ctx = ep_ctx, .devices = devices, .exit = false};
+int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers, int peer_fd) {
+    struct d_handler_context h_ctx = { .ep_ctx = ep_ctx, .devices = devices, .exit = false, .peer_fd = peer_fd};
     while (can_exit(&h_ctx) == false) {
         size_t fd_count = ep_ctx->entries.r.length;
         struct epoll_event epoll_buff[fd_count];
@@ -304,7 +304,7 @@ err:
 int run(struct daemon_arg* d_arg) {
     CHECK(setsid() == -1);
     CHECK(d_init_log(d_arg->d_type) == -1);
-    CHECK(d_loop(d_arg->ep_ctx, d_arg->devices, d_arg->handlers) == -1);
+    CHECK(d_loop(d_arg->ep_ctx, d_arg->devices, d_arg->handlers, d_arg->peer_fd) == -1);
     CHECK(cleanup(d_arg) == -1);
     return 0;
 err:

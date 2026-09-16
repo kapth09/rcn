@@ -41,6 +41,7 @@ static int emit_event(device_info_arr *devices, struct peer_msg_event event) {
     CHECK(write(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
     return 0;
 err:
+    ERR_LOG("emit_event");
     return -1;
 }
 
@@ -125,7 +126,7 @@ err:
 
 int s_start(const int port) {
     device_info_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct libevdev*), RCN_STD_CAPACITY) == -1);
+    CHECK(u_array_init(&devices.r, sizeof(struct device_info), RCN_STD_CAPACITY) == -1);
 
     struct epoll_context ep_ctx = {};
     CHECK(d_init_epoll(&ep_ctx) == -1);

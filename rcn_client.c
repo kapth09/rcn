@@ -68,13 +68,21 @@ err:
 }
 
 static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
-    CHECK(entry->device != NULL);
     struct input_event i_evt = { 0 };
-    CHECK(read(entry->fd, &i_evt, sizeof(i_evt)) == -1);
-    union peer_msg_data data;
-    data.event.evt_data = i_evt;
-    data.event.random_id = entry->device->random_id;
-    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
+    for (;;) {
+        ssize_t bytes_read = read(entry->fd, &i_evt, sizeof(i_evt));
+        if (bytes_read == 0)
+            break;
+        if (bytes_read == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            goto err;
+        }
+        union peer_msg_data data;
+        data.event.evt_data = i_evt;
+        data.event.random_id = entry->device->random_id;
+        CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
+    }
     return 0;
 err:
     ERR_LOG("handler_device");
@@ -150,7 +158,7 @@ err:
 
 int c_start(int port, char *host, char_arr devices_arg) {
     device_info_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct libevdev*), devices_arg.r.length) == -1);
+    CHECK(u_array_init(&devices.r, sizeof(struct device_info), devices_arg.r.length) == -1);
 
     struct epoll_context ep_ctx = {};
     CHECK(d_init_epoll(&ep_ctx) == -1);

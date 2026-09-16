@@ -56,7 +56,7 @@ int u_array_add(struct u_array* arr, void* data) {
     if (arr->data == NULL)
         DO_GOTO(errno = EFAULT, err);
     if (arr->length == arr->capacity)
-	CHECK(u_array_resize(arr, arr->capacity) == -1);
+        CHECK(u_array_resize(arr, arr->capacity) == -1);
     void* offset = arr->data + (arr->size * arr->length);
     memcpy(offset, data, arr->size);
     arr->length++;

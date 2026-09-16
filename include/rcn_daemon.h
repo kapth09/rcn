@@ -45,7 +45,7 @@ int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type);
 int d_epoll_add_device(struct epoll_context* ep_ctx, struct device_info* dev);
 int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_entry* entry);
 int d_fork(struct daemon_arg* d_arg, r_handler_t r_handler, struct relay_arg r_arg);
-int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers);
+int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers, int peer_fd);
 int d_write_relay(int relay_fd, enum relay_msg_type msg_type);
 int d_write_peer(int peer_fd, enum peer_msg_type type, union peer_msg_data data);
 int d_sock_msg(struct d_handler_context* h_ctx, enum d_msg_source source, enum peer_msg_type peer_msg);
