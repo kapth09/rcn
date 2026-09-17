@@ -1,7 +1,7 @@
 #ifndef RCN_RCN_RELAY_H
 #define RCN_RCN_RELAY_H
 
-#include "rcn.h"
+#include "rcn_daemon.h"
 
 enum relay_msg_type {
     RELAY_MSG_CONTINUE,
@@ -12,6 +12,11 @@ enum relay_msg_type {
     RELAY_MSG_ERR
 };
 
+enum relay_state {
+    RELAY_AWAIT,
+    RELAY_SLEEP,
+};
+
 struct relay_msg {
     enum relay_msg_type type;
 };
@@ -19,6 +24,16 @@ struct relay_msg {
 struct relay_arg {
     enum relay_msg_type type_sent;
     enum daemon_type d_type;
+};
+
+struct relay {
+    struct stream stream;
+    enum relay_state state;
+};
+
+struct relay_context {
+    relay_arr relays;
+    int usock_fd;
 };
 
 typedef typeof(int(struct relay_arg arg)) *r_handler_t;

@@ -1,7 +1,7 @@
 #ifndef RCN_RCN_DEV_H
 #define RCN_RCN_DEV_H
 
-#include "rcn.h"
+#include "rcn_types.h"
 #include <stdint.h>
 #include <linux/uinput.h>
 #include <linux/input.h>
@@ -15,7 +15,7 @@
 #define MAX_REL_BYTES   ((REL_MAX+7) / 8)
 #define MAX_PROP_BYTES  ((INPUT_PROP_MAX+7) / 8)
 
-struct device_info {
+struct device {
     uint8_t evtbit[MAX_EVT_BYTES];
     uint8_t keybit[MAX_KEY_BYTES];
     uint8_t absbit[MAX_ABS_BYTES];
@@ -24,15 +24,19 @@ struct device_info {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
+    struct stream stream;
     struct epoll_entry* entry;
     size_t random_id;
-    int fd;
 };
 
-int e_init_device(struct epoll_context* ep_ctx, device_info_arr* devices, const char *dev_path, struct device_info* out_dev);
-int e_grab_device_by_id(device_info_arr* devices, size_t random_id, bool grab);
-int e_grab_device_by_ptr(struct device_info* dev, bool grab);
-int e_get_device_info(int dev_fd, struct device_info* dev);
-int e_create_udev(struct epoll_context* ep_ctx, device_info_arr* devices, struct device_info* new_dev);
+struct device_context {
+    device_arr devices;
+};
+
+int e_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device* out_dev);
+int e_grab_device_by_id(device_arr* devices, size_t random_id, bool grab);
+int e_grab_device_by_ptr(struct device* dev, bool grab);
+int e_get_device_info(int dev_fd, struct device* dev);
+int e_create_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device* new_dev);
 
 #endif //RCN_RCN_DEV_H

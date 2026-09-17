@@ -1,16 +1,24 @@
 #ifndef RCN_RCN_PEER_H
 #define RCN_RCN_PEER_H
 
-#include "rcn.h"
-#include "rcn_evdev.h"
+#include "rcn_daemon.h"
 
 enum peer_msg_type {
+    PEER_MSG_IDLE,
     PEER_MSG_DEV_CRT,
     PEER_MSG_DEV_DEL,
-    PEER_MSG_EVT,
+    PEER_MSG_EVENT,
     PEER_MSG_PAUSE,
     PEER_MSG_RESUME,
     PEER_MSG_STOP,
+};
+
+struct peer_msg_dev_crt {
+    struct device dev;
+};
+
+struct peer_msg_dev_del {
+    size_t random_id;
 };
 
 struct peer_msg_event {
@@ -18,14 +26,18 @@ struct peer_msg_event {
     size_t random_id;
 };
 
-union peer_msg_data {
-    struct device_info dev_info;
-    struct peer_msg_event event;
+enum peer_conn_state {
+    PEER_CONN_PAUSED,
+    PEER_CONN_RESUMED,
 };
 
-struct peer_msg {
-    enum peer_msg_type type;
-    union peer_msg_data data;
+struct peer_context {
+    struct stream stream;
+    enum peer_conn_state peer_state;
+    enum peer_msg_type expected_msg;
+    int isock_fd;
 };
+
+size_t p_msg_size(enum peer_msg_type msg_type);
 
 #endif //RCN_RCN_PEER_H

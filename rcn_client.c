@@ -70,7 +70,7 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_device(struct d_context *h_ctx, struct epoll_entry *entry) {
     struct input_event i_evt = { 0 };
     CHECK(d_read_all(entry->fd, &i_evt, sizeof(i_evt)) == -1);
     union peer_msg_data data;
@@ -78,14 +78,14 @@ static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *e
     data.event.random_id = entry->device->random_id;
     if (i_evt.type == EV_SYN)
         printf("syn\n");
-    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
+    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVENT, data) == -1);
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_peer(struct d_context *h_ctx, struct epoll_entry *entry) {
     struct peer_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -116,7 +116,7 @@ err:
     return -1;
 }
 
-static int handler_relay(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_relay(struct d_context *h_ctx, struct epoll_entry *entry) {
     struct relay_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -153,8 +153,8 @@ err:
 }
 
 int c_start(int port, char *host, char_arr devices_arg) {
-    device_info_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct device_info), devices_arg.r.length) == -1);
+    device_arr devices = {};
+    CHECK(u_array_init(&devices.r, sizeof(struct device), devices_arg.r.length) == -1);
 
     struct epoll_context ep_ctx = {};
     CHECK(d_init_epoll(&ep_ctx) == -1);
@@ -169,7 +169,7 @@ int c_start(int port, char *host, char_arr devices_arg) {
     for (size_t i = 0; i < devices_arg.r.length; i++) {
         char *dev_path = NULL;
         CHECK(u_array_getv(&devices_arg.r, &dev_path, i) == -1);
-        struct device_info dev = { 0 };
+        struct device dev = { 0 };
         CHECK(e_init_device(&ep_ctx, &devices, dev_path, &dev) == -1);
         union peer_msg_data data =  { .dev_info = dev };
         CHECK(d_write_peer(psock_fd, PEER_MSG_DEV_CRT, data) == -1);

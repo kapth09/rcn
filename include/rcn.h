@@ -1,9 +1,9 @@
 #ifndef RCN_H
 #define RCN_H
 
-#include "rcn_util.h"
-#include <stdio.h>
+#include "rcn_types.h"
 #include <errno.h>
+#include <stdio.h>
 
 #define ERR_GOTO(label, ...) 					\
     do { 							            \
@@ -52,35 +52,6 @@
 #define RCN_STD_CAPACITY 10
 #define RCN_DEV_MAX_NAME_LEN 255
 
-U_DEFINE_ARR(device_info_arr, struct device_info);
-U_DEFINE_ARR(epoll_entry_arr, struct epoll_entry);
-U_DEFINE_ARR(char_arr, char);
-
-enum daemon_type {
-    DAEMON_SERVER,
-    DAEMON_CLIENT,
-};
-
-enum fd_type {
-    FD_USOCK,
-    FD_RELAY,
-    FD_ISOCK,
-    FD_PEER,
-    FD_DEV,
-};
-
-struct epoll_entry {
-    int fd;
-    enum fd_type type;
-    struct device_info* device; // only useable if type==FD_DEV, else NULL
-};
-
-struct epoll_context {
-    epoll_entry_arr entries;    // stores pointers to struct epoll_entry
-    int epoll_fd;
-    int relay_count;
-    int peer_count;
-};
 
 /* rcn_server.c */
 int s_start(int port);

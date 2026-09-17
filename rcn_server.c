@@ -1,5 +1,5 @@
 #include "include/rcn.h"
-#include "include/rcn_evdev.h"
+#include "include/rcn_device.h"
 #include "include/rcn_daemon.h"
 #include <unistd.h>
 #include <sys/socket.h>
@@ -23,14 +23,14 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_device(struct d_context *h_ctx, struct epoll_entry *entry) {
     // data is never read from uinput devices, so this function is empty
     (void) entry;
     (void) h_ctx;
     return 0;
 }
-static int emit_event(device_info_arr *devices, struct peer_msg_event event) {
-    struct device_info *dev = NULL;
+static int emit_event(device_arr *devices, struct peer_msg_event event) {
+    struct device *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
         if (dev->random_id == event.random_id)
@@ -46,7 +46,7 @@ err:
     return -1;
 }
 
-static int handler_peer(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_peer(struct d_context *h_ctx, struct epoll_entry *entry) {
     struct peer_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -67,7 +67,7 @@ static int handler_peer(struct d_handler_context *h_ctx, struct epoll_entry *ent
             CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_STOP) == -1);
             break;
         }
-        case PEER_MSG_EVT: {
+        case PEER_MSG_EVENT: {
             printf("server: peer evt\n");
             CHECK(emit_event(h_ctx->devices, msg.data.event) == -1);
             break;
@@ -89,7 +89,7 @@ err:
     return -1;
 }
 
-static int handler_relay(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
+static int handler_relay(struct d_context *h_ctx, struct epoll_entry *entry) {
     struct relay_msg msg = {};
     ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
     if (read_bytes == 0)
@@ -126,8 +126,8 @@ err:
 }
 
 int s_start(const int port) {
-    device_info_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct device_info), RCN_STD_CAPACITY) == -1);
+    device_arr devices = {};
+    CHECK(u_array_init(&devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
 
     struct epoll_context ep_ctx = {};
     CHECK(d_init_epoll(&ep_ctx) == -1);

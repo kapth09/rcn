@@ -3,7 +3,7 @@
 
 #include <fcntl.h>
 
-#include "include/rcn_evdev.h"
+#include "include/rcn_device.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <grp.h>
@@ -15,82 +15,64 @@
 
 #define DEFAULT_USOCK_COUNT 3
 
-int d_write_all(int fd, void* data, size_t len) {
-    size_t total = 0;
-    while (total < len) {
-        ssize_t chunk = write(fd, ((uint8_t*)(data)) + total, len - total);
-        if (chunk == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                usleep(1000000);    // sleep 1ms to avoid busy waiting
-            else
-                goto err;
-        } else {
-            total += (size_t)chunk;
-        }
-    }
+static int d_stream(struct stream* stream) {
+    uintptr_t buffer_offset = (uintptr_t)stream->buffer + stream->buffer_streamed;
+    size_t size_offset = stream->buffer_size - stream->buffer_streamed;
+    ssize_t streamed;
+    if (stream->state == D_STREAM_READING)
+        streamed = TRY(read(stream-> fd, (void*)buffer_offset, size_offset), -1);
+    else if (stream->state == D_STREAM_WRITING)
+        streamed = TRY(write(stream-> fd, (void*)buffer_offset, size_offset), -1);
+    else
+        ERR_GOTO(err, "err: Invalid peer_data_state: %d\n", stream->state);
+    CHECK(streamed == -1 && (errno != EAGAIN && errno != EWOULDBLOCK));
+    stream->buffer_streamed += streamed;
+    CHECK(stream->buffer_streamed > stream->buffer_size);
+    if (streamed == 0)
+        stream->state = D_STREAM_CLOSED;
+    if (stream->buffer_streamed == stream->buffer_size)
+        stream->state = D_STREAM_COMPLETE;
     return 0;
 err:
-    ERR_LOG("d_write_all");
+    stream->state = D_STREAM_CLOSED;
+    ERR_LOG("p_stream");
     return -1;
 }
 
-ssize_t d_read_all(int fd, void* data, size_t len) {
-    size_t total = 0;
-    while (total < len) {
-        ssize_t chunk = read(fd, ((uint8_t*)(data)) + total, len - total);
-        if (chunk == 0)
-            break;
-        if (chunk == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                usleep(1000000);    // sleep 1ms to avoid busy waiting
-            else
-                goto err;
-        } else {
-            total += (size_t)chunk;
-        }
-    }
-    return total;
-err:
-    if (errno != 0)
-        ERR_LOG("d_read_all");
-    return -1;
-}
-
-ssize_t d_read_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry, void* buffer, size_t size) {
-    ssize_t read = d_read_all(entry->fd, buffer, size);
-    if (read == -1 || read == 0)
+ssize_t d_stream_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry) {
+    const int ret = d_stream(&entry->stream);
+    if (entry->stream.state == D_STREAM_CLOSED)
         CHECK(d_epoll_close_remove(ep_ctx, entry) == -1);
-    return read;
+    CHECK(ret == -1);
+    return 0;
 err:
     ERR_LOG("d_read_or_close");
     return -1;
 }
 
-static int accept_sock(struct d_handler_context* h_ctx, struct epoll_entry* entry, enum fd_type type) {
-    struct sockaddr_un r_uaddr = {};
+static int accept_isock(struct epoll_context* ep_ctx, const struct stream* stream, int* peer_fd) {
     struct sockaddr_in p_iaddr = {};
-    struct sockaddr* addr;
-    socklen_t addr_len;
-    enum fd_type conn_type;
-    if (type == FD_USOCK) {
-        addr = (struct sockaddr*)&r_uaddr;
-        addr_len = sizeof(r_uaddr);
-        conn_type = FD_RELAY;
-    } else if (type == FD_ISOCK) {
-        addr = (struct sockaddr*)&p_iaddr;
-        addr_len = sizeof(p_iaddr);
-        conn_type = FD_PEER;
-    } else {
-        goto err;
-    }
-    int sock_fd = TRY(accept(entry->fd, addr, &addr_len), -1);
+    struct sockaddr* addr = (struct sockaddr*)&p_iaddr;
+    socklen_t addr_len = sizeof(p_iaddr);
+    int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
-    if (conn_type == FD_PEER)
-        h_ctx->peer_fd = sock_fd;
-    CHECK(d_epoll_add(h_ctx->ep_ctx, sock_fd, conn_type) == -1);
+    CHECK(d_epoll_add(ep_ctx, sock_fd, FD_PEER) == -1);
+    *peer_fd = sock_fd;
+err:
+    ERR_LOG("accept_isock");
+    return -1;
+}
+
+static int accept_usock(struct epoll_context* ep_ctx, const struct stream* stream) {
+    struct sockaddr_un r_uaddr = {};
+    struct sockaddr* addr = (struct sockaddr*)&r_uaddr;
+    socklen_t addr_len = sizeof(r_uaddr);
+    int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
+    CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
+    CHECK(d_epoll_add(ep_ctx, sock_fd, FD_RELAY) == -1);
     return 0;
 err:
-    ERR_LOG("accept_sock");
+    ERR_LOG("accept_usock");
     return -1;
 }
 
@@ -109,29 +91,6 @@ int d_print_log(enum daemon_type d_type) {
     return 0;
 err:
     ERR_LOG("d_print_log");
-    return -1;
-}
-
-int d_write_peer(int peer_fd, enum peer_msg_type type, union peer_msg_data data) {
-    struct peer_msg msg = {
-        .type = type,
-        .data = data
-    };
-    CHECK(d_write_all(peer_fd, &msg, sizeof(msg)) == -1);
-    return 0;
-err:
-    ERR_LOG("d_write_peer");
-    return -1;
-}
-
-int d_write_relay(int relay_fd, enum relay_msg_type msg_type) {
-    struct relay_msg msg = {
-        .type = msg_type
-    };
-    CHECK(d_write_all(relay_fd, &msg, sizeof(msg)) == -1);
-    return 0;
-err:
-    ERR_LOG("d_write_relay");
     return -1;
 }
 
@@ -200,12 +159,9 @@ err:
 }
 
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
-    if (type == FD_DEV)
-        DO_GOTO(fprintf(stderr, "type FD_DEV invalid for normal d_epoll_add\n"), err);
     struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
     entry->type = type;
-    entry->fd = fd;
-    entry->device = NULL;
+    entry->stream.fd = fd;
     CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
     struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry, };
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
@@ -216,32 +172,16 @@ err:
     return -1;
 }
 
-int d_epoll_add_device(struct epoll_context* ep_ctx, struct device_info* dev) {
-    struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
-    entry->type = FD_DEV;
-    entry->fd = dev->fd;
-    entry->device = dev;
-    dev->entry = entry;
-    CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
-    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry };
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, entry->fd, &u_evt) == -1);
-    CHECK(update_epoll_counter(ep_ctx, FD_DEV, 1) == -1);
-    return 0;
-err:
-    ERR_LOG("d_epoll_add_device");
-    return -1;
-}
-
 int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_entry* entry) {
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, entry->fd, NULL) == -1);
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, entry->stream.fd, NULL) == -1);
     size_t index = TRY(u_array_find_index(&ep_ctx->entries.r, &entry), -1);
     CHECK(u_array_remove(&ep_ctx->entries.r, index) == -1);
     CHECK(update_epoll_counter(ep_ctx, entry->type, -1) == -1);
-    close(entry->fd);
+    close(entry->stream.fd);
     free(entry);
     return 0;
 err:
-    close(entry->fd);
+    close(entry->stream.fd);
     ERR_LOG("d_epoll_remove");
     return -1;
 }
@@ -261,24 +201,7 @@ err:
     return -1;
 }
 
-int d_sock_msg(struct d_handler_context* h_ctx, enum d_msg_source source, enum peer_msg_type peer_msg) {
-    for (size_t i = 0; i < h_ctx->ep_ctx->entries.r.length; i++) {
-        struct epoll_entry* entry = {};
-        CHECK(u_array_getv(&h_ctx->ep_ctx->entries.r, (void**)&entry, i) == -1);
-        if (entry->type == FD_RELAY) {
-            CHECK(d_write_relay(entry->fd, RELAY_MSG_STOP) == -1);
-        } else if (entry->type == FD_PEER && source == SRC_RELAY) {
-            const union peer_msg_data data = {0};
-            CHECK(d_write_peer(entry->fd, peer_msg, data) == -1);
-        }
-    }
-    return 0;
-err:
-    ERR_LOG("d_msg_resume");
-    return -1;
-}
-
-static int can_exit(struct d_handler_context* h_ctx) {
+static int can_exit(struct d_context* h_ctx) {
     if (h_ctx->exit == false)
         return 0;
     if (h_ctx->ep_ctx->peer_count > 0)
@@ -288,78 +211,104 @@ static int can_exit(struct d_handler_context* h_ctx) {
     return 1;
 }
 
-int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop_handlers handlers, int peer_fd) {
-    struct d_handler_context h_ctx = { .ep_ctx = ep_ctx, .devices = devices, .exit = false, .peer_fd = peer_fd};
-    while (can_exit(&h_ctx) == false) {
-        size_t fd_count = ep_ctx->entries.r.length;
-        struct epoll_event epoll_buff[fd_count];
-        int nfds = TRY(epoll_wait(ep_ctx->epoll_fd, epoll_buff, fd_count, -1), -1);
-        for (int i = 0; i < nfds; i++) {
-            struct epoll_event evt = epoll_buff[i];
-            struct epoll_entry* entry = evt.data.ptr;
-            switch (entry->type) {
-                case FD_USOCK: {
-                    CHECK(accept_sock(&h_ctx, entry, FD_USOCK));
-                    break;
-                }
-                case FD_RELAY: {
-                    CHECK(handlers.relay(&h_ctx, entry));
-                    break;
-                }
-                case FD_ISOCK: {
-                    CHECK(accept_sock(&h_ctx, entry, FD_ISOCK));
-                    break;
-                }
-                case FD_PEER: {
-                    CHECK(handlers.peer(&h_ctx, entry));
-                    break;
-                }
-                case FD_DEV: {
-                    CHECK(handlers.device(&h_ctx, entry));
-                    break;
-                }
-                default: goto err;
+static int dispatch_epoll(struct epoll_context* ep_ctx, struct epoll_event* epoll_buff, size_t fd_count) {
+    int nfds = TRY(epoll_wait(ep_ctx->epoll_fd, epoll_buff, fd_count, -1), -1);
+    for (int i = 0; i < nfds; i++) {
+        struct epoll_event evt = epoll_buff[i];
+        struct epoll_entry* entry = evt.data.ptr;
+        switch (entry->type) {
+            case FD_USOCK: {
+                CHECK(accept_usock(ep_ctx, &entry->stream) == -1);
+                break;
+            }
+            case FD_ISOCK: {
+                struct peer_context* p_ctx = (struct peer_context*)&entry->stream;
+                CHECK(accept_isock(ep_ctx, &entry->stream, &p_ctx->isock_fd) == -1);
+                break;
+            }
+            case FD_PEER: {
+                CHECK(d_stream_or_close(ep_ctx, entry) == -1);
+                break;
+            }
+            case FD_RELAY: {
+                CHECK(d_stream_or_close(ep_ctx, entry) == -1);
+                break;
+            }
+            case FD_DEV: {
+                CHECK(d_stream_or_close(ep_ctx, entry) == -1);
+                break;
             }
         }
+    }
+    return nfds;
+err:
+    ERR_LOG("dispatch_epoll");
+    return -1;
+}
+
+static int resolve_fd_context(struct d_context* d_ctx, struct epoll_handlers handlers, struct epoll_event* epoll_buff, int fd_count) {
+    for (int i = 0; i < fd_count; i++) {
+        struct epoll_event evt = epoll_buff[i];
+        struct epoll_entry* entry = evt.data.ptr;
+        bool is_completed = entry->stream.state == D_STREAM_COMPLETE;
+        switch (entry->type) {
+            case FD_PEER: {
+                if (is_completed)
+                    CHECK(handlers.peer_handler(d_ctx, &entry->stream) == -1);
+                break;
+            }
+            case FD_RELAY: {
+                if (is_completed)
+                    CHECK(handlers.relay_handler(d_ctx, &entry->stream) == -1);
+                break;
+            }
+            case FD_DEV: {
+                if (is_completed)
+                    CHECK(handlers.device_handler(d_ctx, &entry->stream) == -1);
+                break;
+            }
+            case FD_ISOCK: return 0;
+            case FD_USOCK: return 0;
+            default: ERR_GOTO(err, "err: invalid entry-type\n");
+        }
+    }
+    return 0;
+err:
+    ERR_LOG("resolve_fd_context");
+    return -1;
+}
+
+int d_loop(struct d_context* d_ctx, struct epoll_handlers handlers) {
+    struct epoll_context* ep_ctx = d_ctx->ep_ctx;
+    while (can_exit(d_ctx) == false) {
+        const size_t fd_count = ep_ctx->entries.r.length;
+        struct epoll_event epoll_buff[fd_count];
+        const int nfds = TRY(dispatch_epoll(ep_ctx, epoll_buff, fd_count), -1);
+        CHECK(resolve_fd_context(d_ctx, handlers, epoll_buff, nfds) == -1);
     }
     return 0;
 err:
     ERR_LOG("d_loop");
     return -1;
 }
-
-int cleanup(struct daemon_arg* d_arg) {
-    device_info_arr* devices = d_arg->devices;
-    for (size_t i = 0; i < devices->r.length; i++) {
-        struct device_info dev = { 0 };
-        CHECK(u_array_getv(&devices->r, &dev, i) == -1);
-        CHECK(close(dev.entry->fd) == -1);
-    }
-    CHECK(u_array_free(&d_arg->devices->r) == -1);
-    CHECK(u_array_free(&d_arg->ep_ctx->entries.r) == -1);
-    return 0;
-err:
-    ERR_LOG("cleanup");
-    return -1;
-}
-
 int run(struct daemon_arg* d_arg) {
     CHECK(setsid() == -1);
     CHECK(d_init_log(d_arg->d_type) == -1);
-    CHECK(d_loop(d_arg->ep_ctx, d_arg->devices, d_arg->handlers, d_arg->peer_fd) == -1);
-    CHECK(cleanup(d_arg) == -1);
+    CHECK(d_loop(&d_arg->d_ctx, d_arg->handlers) == -1);
+    // TODO: REIMPLEMENT
+    // CHECK(cleanup(d_arg) == -1);
     return 0;
 err:
     ERR_LOG("d_run");
     return -1;
 }
 
-int d_fork(struct daemon_arg* d_arg, r_handler_t r_handler, struct relay_arg r_arg) {
+int d_fork(struct daemon_arg* d_arg, struct relay_arg r_arg) {
     const pid_t pid = TRY(fork(), -1);
     if (pid == 0) {
         CHECK(run(d_arg) == -1);
     } else {
-        CHECK(r_handler(r_arg) == -1);
+        CHECK(r_trigger(r_arg) == -1);
     }
     return 0;
 err:
