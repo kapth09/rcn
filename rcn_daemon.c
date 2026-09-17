@@ -1,5 +1,8 @@
 #include "include/rcn.h"
 #include "include/rcn_daemon.h"
+
+#include <fcntl.h>
+
 #include "include/rcn_evdev.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,16 +15,54 @@
 
 #define DEFAULT_USOCK_COUNT 3
 
-int d_read_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry, void* buffer, size_t size) {
-    ssize_t bytes_read = read(entry->fd, buffer, size);
-    if (bytes_read <= 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return 0;
-        CHECK(d_epoll_close_remove(ep_ctx, entry) == -1);
-        return 0;
+int d_write_all(int fd, void* data, size_t len) {
+    size_t total = 0;
+    while (total < len) {
+        ssize_t chunk = write(fd, ((uint8_t*)(data)) + total, len - total);
+        if (chunk == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                usleep(1000000);    // sleep 1ms to avoid busy waiting
+            else
+                goto err;
+        } else {
+            total += (size_t)chunk;
+        }
     }
-    return bytes_read;
+    return 0;
 err:
+    ERR_LOG("d_write_all");
+    return -1;
+}
+
+ssize_t d_read_all(int fd, void* data, size_t len) {
+    size_t total = 0;
+    while (total < len) {
+        ssize_t chunk = read(fd, ((uint8_t*)(data)) + total, len - total);
+        if (chunk == 0)
+            break;
+        if (chunk == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                usleep(1000000);    // sleep 1ms to avoid busy waiting
+            else
+                goto err;
+        } else {
+            total += (size_t)chunk;
+        }
+    }
+    return total;
+err:
+    if (errno != 0)
+        ERR_LOG("d_read_all");
+    return -1;
+}
+
+ssize_t d_read_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry, void* buffer, size_t size) {
+    ssize_t read = d_read_all(entry->fd, buffer, size);
+    if (read == -1 || read == 0)
+        CHECK(d_epoll_close_remove(ep_ctx, entry) == -1);
+    return read;
+err:
+    ERR_LOG("d_read_or_close");
     return -1;
 }
 
@@ -43,6 +84,7 @@ static int accept_sock(struct d_handler_context* h_ctx, struct epoll_entry* entr
         goto err;
     }
     int sock_fd = TRY(accept(entry->fd, addr, &addr_len), -1);
+    CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     if (conn_type == FD_PEER)
         h_ctx->peer_fd = sock_fd;
     CHECK(d_epoll_add(h_ctx->ep_ctx, sock_fd, conn_type) == -1);
@@ -75,7 +117,7 @@ int d_write_peer(int peer_fd, enum peer_msg_type type, union peer_msg_data data)
         .type = type,
         .data = data
     };
-    CHECK(write(peer_fd, &msg, sizeof(msg)) == -1);
+    CHECK(d_write_all(peer_fd, &msg, sizeof(msg)) == -1);
     return 0;
 err:
     ERR_LOG("d_write_peer");
@@ -86,7 +128,7 @@ int d_write_relay(int relay_fd, enum relay_msg_type msg_type) {
     struct relay_msg msg = {
         .type = msg_type
     };
-    CHECK(write(relay_fd, &msg, sizeof(msg)) == -1);
+    CHECK(d_write_all(relay_fd, &msg, sizeof(msg)) == -1);
     return 0;
 err:
     ERR_LOG("d_write_relay");
@@ -206,7 +248,7 @@ err:
 
 int d_init_usock(char* sock_path, size_t path_len) {
     unlink(sock_path);
-    int d_usock_fd = TRY(socket(AF_UNIX, SOCK_STREAM, 0), -1);
+    int d_usock_fd = TRY(socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), -1);
     struct sockaddr_un d_uaddr = {
         .sun_family = AF_UNIX,
     };

@@ -153,7 +153,9 @@ int e_create_udev(struct epoll_context* ep_ctx, device_info_arr* devices, struct
     }
     new_dev->fd = u_fd;
     struct uinput_setup setup = { .id = new_dev->dev_id };
-    strncpy(setup.name, new_dev->name, UINPUT_MAX_NAME_SIZE-1);
+    char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
+    snprintf(tmp_buff, sizeof(tmp_buff), "(rcn-virt) %s", new_dev->name);
+    strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
     CHECK(u_array_add(&devices->r, new_dev) == -1);

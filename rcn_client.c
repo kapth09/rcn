@@ -10,6 +10,8 @@
 #include <netinet/tcp.h>
 
 int c_close_connection(int fd) {
+    int flags = TRY(fcntl(fd, F_GETFL, 0), -1);
+    CHECK(fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1);
     // wait max. 1 second for the server to send a FIN paket, if not, force close the connection
     struct timeval tv = { .tv_sec =  1, .tv_usec =  0};
     CHECK(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1);
@@ -17,7 +19,8 @@ int c_close_connection(int fd) {
     uint8_t buffer[64] = { 0 };
     ssize_t bytes_read;
     while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {}
-    CHECK(bytes_read == -1);
+    if (bytes_read == -1 && (errno != EAGAIN && errno != EWOULDBLOCK))
+        goto err;
     close(fd);
     return 0;
 err:
@@ -69,20 +72,13 @@ err:
 
 static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *entry) {
     struct input_event i_evt = { 0 };
-    for (;;) {
-        ssize_t bytes_read = read(entry->fd, &i_evt, sizeof(i_evt));
-        if (bytes_read == 0)
-            break;
-        if (bytes_read == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK)
-                break;
-            goto err;
-        }
-        union peer_msg_data data;
-        data.event.evt_data = i_evt;
-        data.event.random_id = entry->device->random_id;
-        CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
-    }
+    CHECK(d_read_all(entry->fd, &i_evt, sizeof(i_evt)) == -1);
+    union peer_msg_data data;
+    data.event.evt_data = i_evt;
+    data.event.random_id = entry->device->random_id;
+    if (i_evt.type == EV_SYN)
+        printf("syn\n");
+    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVT, data) == -1);
     return 0;
 err:
     ERR_LOG("handler_device");

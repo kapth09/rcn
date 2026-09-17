@@ -29,7 +29,6 @@ static int handler_device(struct d_handler_context *h_ctx, struct epoll_entry *e
     (void) h_ctx;
     return 0;
 }
-
 static int emit_event(device_info_arr *devices, struct peer_msg_event event) {
     struct device_info *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
@@ -38,7 +37,9 @@ static int emit_event(device_info_arr *devices, struct peer_msg_event event) {
             break;
     }
     CHECK(dev == NULL);
-    CHECK(write(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
+    if (event.evt_data.type == EV_SYN)
+        printf("syn\n");
+    CHECK(d_write_all(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
     return 0;
 err:
     ERR_LOG("emit_event");
@@ -95,7 +96,7 @@ static int handler_relay(struct d_handler_context *h_ctx, struct epoll_entry *en
         return 0;
     switch (msg.type) {
         case RELAY_MSG_START: {
-            printf("client: relay start\n");
+            printf("server: relay start\n");
             CHECK(d_write_relay(entry->fd, RELAY_MSG_STOP) == -1);
             break;
         }

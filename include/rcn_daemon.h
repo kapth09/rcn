@@ -35,7 +35,7 @@ struct daemon_arg {
 };
 
 /* rcn_daemon.c */
-int d_read_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry, void* buffer, size_t size);
+ssize_t d_read_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry, void* buffer, size_t size);
 int d_print_log(enum daemon_type d_type);
 int d_init_dir();
 int d_init_log(enum daemon_type d_type);
@@ -49,5 +49,7 @@ int d_loop(struct epoll_context* ep_ctx, device_info_arr* devices, struct d_loop
 int d_write_relay(int relay_fd, enum relay_msg_type msg_type);
 int d_write_peer(int peer_fd, enum peer_msg_type type, union peer_msg_data data);
 int d_sock_msg(struct d_handler_context* h_ctx, enum d_msg_source source, enum peer_msg_type peer_msg);
+int d_write_all(int fd, void* data, size_t len);
+ssize_t d_read_all(int fd, void* data, size_t len);
 
 #endif //RCN_RCN_DAEMON_H
