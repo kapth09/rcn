@@ -15,6 +15,19 @@
 
 #define DEFAULT_USOCK_COUNT 3
 
+int d_stream_set(struct stream* stream, size_t size, enum stream_state state) {
+    if (stream->buffer != NULL)
+        free(stream->buffer);
+    stream->buffer = TRY(calloc(1, size), NULL);
+    stream->buffer_size = size;
+    stream->buffer_streamed = 0;
+    stream->state = state;
+    return 0;
+err:
+    ERR_LOG("d_stream_set");
+    return -1;
+}
+
 static int d_stream(struct stream* stream) {
     uintptr_t buffer_offset = (uintptr_t)stream->buffer + stream->buffer_streamed;
     size_t size_offset = stream->buffer_size - stream->buffer_streamed;
@@ -63,6 +76,17 @@ err:
     return -1;
 }
 
+int d_init_peer_ctx(struct peer_context* p_ctx, int isock_fd) {
+    p_ctx->isock_fd = isock_fd;
+    p_ctx->peer_state = PERR_CONN_DISCONNECTED;
+    p_ctx->expected_msg = PEER_MSG_IDLE;
+    CHECK(d_stream_set(&p_ctx->stream, sizeof(enum peer_msg_type), D_STREAM_READING) == -1);
+    return 0;
+err:
+    ERR_LOG("d_init_peer_ctx");
+    return -1;
+}
+
 static int accept_usock(struct epoll_context* ep_ctx, const struct stream* stream) {
     struct sockaddr_un r_uaddr = {};
     struct sockaddr* addr = (struct sockaddr*)&r_uaddr;
@@ -73,6 +97,23 @@ static int accept_usock(struct epoll_context* ep_ctx, const struct stream* strea
     return 0;
 err:
     ERR_LOG("accept_usock");
+    return -1;
+}
+
+int d_init_relay_ctx(struct relay_context* r_ctx, int usock_fd) {
+    r_ctx->usock_fd = usock_fd;
+    CHECK(u_array_init(&r_ctx->relays.r, sizeof(struct relay), RCN_STD_CAPACITY) == -1);
+    return 0;
+err:
+    ERR_LOG("d_init_relay_ctx");
+    return -1;
+}
+
+int d_init_device_ctx(struct device_context* d_ctx) {
+    CHECK(u_array_init(&d_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+    return 0;
+err:
+    ERR_LOG("d_init_device_ctx");
     return -1;
 }
 
@@ -125,7 +166,7 @@ err:
     return -1;
 }
 
-int d_init_epoll(struct epoll_context* ep_ctx) {
+int d_init_epoll_ctx(struct epoll_context* ep_ctx) {
     ep_ctx->epoll_fd = TRY(epoll_create1(0), -1);
     CHECK(u_array_init(&ep_ctx->entries.r, sizeof(struct epoll_entry*), RCN_STD_CAPACITY) == -1);
     return 0;
@@ -134,7 +175,19 @@ err:
     return -1;
 }
 
-static int update_epoll_counter(struct epoll_context* ep_ctx, enum fd_type type, int op) {
+int d_epoll_entry_update(struct epoll_context* ep_ctx, struct epoll_entry* entry, enum stream_state state) {
+    struct epoll_event evt = {
+        .data.ptr = entry,
+        .events = state == D_STREAM_WRITING ? EPOLLOUT : EPOLLIN,
+    };
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_MOD, entry->stream.fd, &evt) == -1);
+    return 0;
+err:
+    ERR_LOG("d_epoll_entry_update");
+    return -1;
+}
+
+static int epoll_counter_update(struct epoll_context* ep_ctx, enum fd_type type, int op) {
     CHECK(op == 0);
     if (op < 0)
         op = -1;
@@ -165,7 +218,7 @@ int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
     CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
     struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry, };
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
-    CHECK(update_epoll_counter(ep_ctx, type, 1) == -1);
+    CHECK(epoll_counter_update(ep_ctx, type, 1) == -1);
     return 0;
 err:
     ERR_LOG("d_epoll_add");
@@ -176,7 +229,7 @@ int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_entry* entry
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, entry->stream.fd, NULL) == -1);
     size_t index = TRY(u_array_find_index(&ep_ctx->entries.r, &entry), -1);
     CHECK(u_array_remove(&ep_ctx->entries.r, index) == -1);
-    CHECK(update_epoll_counter(ep_ctx, entry->type, -1) == -1);
+    CHECK(epoll_counter_update(ep_ctx, entry->type, -1) == -1);
     close(entry->stream.fd);
     free(entry);
     return 0;

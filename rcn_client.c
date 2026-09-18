@@ -71,14 +71,6 @@ err:
 }
 
 static int handler_device(struct d_context *h_ctx, struct epoll_entry *entry) {
-    struct input_event i_evt = { 0 };
-    CHECK(d_read_all(entry->fd, &i_evt, sizeof(i_evt)) == -1);
-    union peer_msg_data data;
-    data.event.evt_data = i_evt;
-    data.event.random_id = entry->device->random_id;
-    if (i_evt.type == EV_SYN)
-        printf("syn\n");
-    CHECK(d_write_peer(h_ctx->peer_fd, PEER_MSG_EVENT, data) == -1);
     return 0;
 err:
     ERR_LOG("handler_device");
@@ -86,30 +78,6 @@ err:
 }
 
 static int handler_peer(struct d_context *h_ctx, struct epoll_entry *entry) {
-    struct peer_msg msg = {};
-    ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
-    if (read_bytes == 0)
-        return 0;
-    switch (msg.type) {
-        case PEER_MSG_PAUSE: {
-            printf("client: peer pause\n");
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_PAUSE) == -1);
-            break;
-        }
-        case PEER_MSG_RESUME: {
-            printf("client: peer resume\n");
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_RESUME) == -1);
-            break;
-        }
-        case PEER_MSG_STOP: {
-            printf("client: peer stop\n");
-            h_ctx->exit = true;
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_STOP) == -1);
-            CHECK(c_close_connection(entry->fd) == -1);
-            break;
-        }
-        default: break;
-    }
     return 0;
 err:
     ERR_LOG("handler_peer");
@@ -117,35 +85,6 @@ err:
 }
 
 static int handler_relay(struct d_context *h_ctx, struct epoll_entry *entry) {
-    struct relay_msg msg = {};
-    ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
-    if (read_bytes == 0)
-        return 0;
-    switch (msg.type) {
-        case RELAY_MSG_START: {
-            printf("client: relay start\n");
-            CHECK(d_write_relay(entry->fd, RELAY_MSG_STOP) == -1);
-            break;
-        }
-        case RELAY_MSG_PAUSE: {
-            printf("client: relay pause\n");
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_PAUSE) == -1);
-            break;
-        }
-        case RELAY_MSG_RESUME: {
-            printf("client: relay resume\n");
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_RESUME) == -1);
-            break;
-        }
-        case RELAY_MSG_STOP: {
-            printf("client: relay stop\n");
-            h_ctx->exit = true;
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_STOP) == -1);
-            break;
-        }
-        case RELAY_MSG_CONTINUE: // do nothing, fall through
-        default: break;
-    }
     return 0;
 err:
     ERR_LOG("handler_relay");
@@ -157,7 +96,7 @@ int c_start(int port, char *host, char_arr devices_arg) {
     CHECK(u_array_init(&devices.r, sizeof(struct device), devices_arg.r.length) == -1);
 
     struct epoll_context ep_ctx = {};
-    CHECK(d_init_epoll(&ep_ctx) == -1);
+    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
 
     CHECK(d_init_dir() == -1);
     const int usock_fd = TRY(d_init_usock(RCN_CLIENT_SOCKET_PATH, RCN_CLIENT_SOCKET_LEN), -1);

@@ -1,4 +1,5 @@
 #include "include/rcn.h"
+#include "include/rcn_peer.h"
 #include "include/rcn_device.h"
 #include "include/rcn_daemon.h"
 #include <unistd.h>
@@ -23,12 +24,6 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context *h_ctx, struct epoll_entry *entry) {
-    // data is never read from uinput devices, so this function is empty
-    (void) entry;
-    (void) h_ctx;
-    return 0;
-}
 static int emit_event(device_arr *devices, struct peer_msg_event event) {
     struct device *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
@@ -39,86 +34,28 @@ static int emit_event(device_arr *devices, struct peer_msg_event event) {
     CHECK(dev == NULL);
     if (event.evt_data.type == EV_SYN)
         printf("syn\n");
-    CHECK(d_write_all(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
+    // CHECK(d_write_all(dev->fd, &event.evt_data, sizeof(event.evt_data)) == -1);
     return 0;
 err:
     ERR_LOG("emit_event");
     return -1;
 }
 
-static int handler_peer(struct d_context *h_ctx, struct epoll_entry *entry) {
-    struct peer_msg msg = {};
-    ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
-    if (read_bytes == 0)
-        return 0;
-    switch (msg.type) {
-        case PEER_MSG_PAUSE: {
-            printf("server: peer pause\n");
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_PAUSE) == -1);
-            break;
-        }
-        case PEER_MSG_RESUME: {
-            printf("server: peer resume\n");
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_RESUME) == -1);
-            break;
-        }
-        case PEER_MSG_STOP: {
-            printf("server: peer stop\n");
-            CHECK(d_sock_msg(h_ctx, SRC_PEER, PEER_MSG_STOP) == -1);
-            break;
-        }
-        case PEER_MSG_EVENT: {
-            printf("server: peer evt\n");
-            CHECK(emit_event(h_ctx->devices, msg.data.event) == -1);
-            break;
-        }
-        case PEER_MSG_DEV_CRT: {
-            printf("server: peer dev crt\n");
-            CHECK(e_create_udev(h_ctx->ep_ctx, h_ctx->devices, &msg.data.dev_info) == -1);
-            break;
-        }
-        case PEER_MSG_DEV_DEL: {
-            printf("server: peer dev del\n");
-            break;
-        }
-        default: break;
-    }
+static int handler_device(struct d_context* d_ctx, struct stream* stream) {
+    return 0;
+err:
+    ERR_LOG("handler_device");
+    return -1;
+}
+
+static int handler_peer(struct d_context *d_ctx, struct stream* stream) {
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context *h_ctx, struct epoll_entry *entry) {
-    struct relay_msg msg = {};
-    ssize_t read_bytes = TRY(d_read_or_close(h_ctx->ep_ctx, entry, &msg, sizeof(msg)), -1);
-    if (read_bytes == 0)
-        return 0;
-    switch (msg.type) {
-        case RELAY_MSG_START: {
-            printf("server: relay start\n");
-            CHECK(d_write_relay(entry->fd, RELAY_MSG_STOP) == -1);
-            break;
-        }
-        case RELAY_MSG_PAUSE: {
-            printf("server: relay pause\n");
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_PAUSE) == -1);
-            break;
-        }
-        case RELAY_MSG_RESUME: {
-            printf("server: relay resume\n");
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_RESUME) == -1);
-            break;
-        }
-        case RELAY_MSG_STOP: {
-            printf("server: relay stop\n");
-            h_ctx->exit = true;
-            CHECK(d_sock_msg(h_ctx, SRC_RELAY, PEER_MSG_STOP) == -1);
-            break;
-        }
-        case RELAY_MSG_CONTINUE: // do nothing, fall through
-        default: break;
-    }
+static int handler_relay(struct d_context* d_ctx, struct stream* stream) {
     return 0;
 err:
     ERR_LOG("handler_relay");
@@ -126,40 +63,49 @@ err:
 }
 
 int s_start(const int port) {
-    device_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+    CHECK(d_init_dir() == -1);
 
     struct epoll_context ep_ctx = {};
-    CHECK(d_init_epoll(&ep_ctx) == -1);
+    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
 
-    CHECK(d_init_dir() == -1);
     const int usock_fd = TRY(d_init_usock(RCN_SERVER_SOCKET_PATH, RCN_SERVER_SOCKET_LEN), -1);
     CHECK(d_epoll_add(&ep_ctx, usock_fd, FD_USOCK) == -1);
+    struct relay_context relay_ctx = {};
+    CHECK(d_init_relay_ctx(&relay_ctx, usock_fd) == -1);
 
     const int isock_fd = TRY(init_psock(port), -1);
     CHECK(d_epoll_add(&ep_ctx, isock_fd, FD_ISOCK) == -1);
+    struct peer_context peer_ctx = {};
+    CHECK(d_init_peer_ctx(&peer_ctx, isock_fd) == -1);
+
+    struct device_context device_ctx = {};
+    CHECK(d_init_device_ctx(&device_ctx) == -1);
 
     struct daemon_arg d_arg = {
         .d_type = DAEMON_SERVER,
-        .peer_fd = -1,
-        .ep_ctx = &ep_ctx,
-        .devices = &devices,
         .handlers = {
-            .relay = handler_relay,
-            .peer = handler_peer,
-            .device = handler_device,
+            .peer_handler = handler_peer,
+            .relay_handler = handler_relay,
+            .device_handler = handler_device,
+        },
+        .d_ctx = {
+            .ep_ctx = &ep_ctx,
+            .peer_ctx = &peer_ctx,
+            .relay_ctx = &relay_ctx,
+            .device_ctx = &device_ctx,
+            .exit = false,
         }
     };
     struct relay_arg r_arg = {
         .type_sent = RELAY_MSG_START,
         .d_type = DAEMON_SERVER,
     };
-    return d_fork(&d_arg, r_trigger, r_arg);
+    return d_fork(&d_arg, r_arg);
 err:
     if (ep_ctx.entries.r.data != NULL)
         u_array_free(&ep_ctx.entries.r);
-    if (devices.r.data != NULL)
-        u_array_free(&devices.r);
+    if (device_ctx.devices.r.data != NULL)
+        u_array_free(&device_ctx.devices.r);
     ERR_LOG("s_start");
     return -1;
 }

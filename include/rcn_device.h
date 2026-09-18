@@ -15,7 +15,7 @@
 #define MAX_REL_BYTES   ((REL_MAX+7) / 8)
 #define MAX_PROP_BYTES  ((INPUT_PROP_MAX+7) / 8)
 
-struct device {
+struct device_info {
     uint8_t evtbit[MAX_EVT_BYTES];
     uint8_t keybit[MAX_KEY_BYTES];
     uint8_t absbit[MAX_ABS_BYTES];
@@ -24,9 +24,13 @@ struct device {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
+};
+
+struct device {
     struct stream stream;
-    struct epoll_entry* entry;
     size_t random_id;
+    struct epoll_entry* entry;
+    struct device_info info;
 };
 
 struct device_context {

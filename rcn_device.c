@@ -23,7 +23,7 @@ err:
 }
 
 static int has_any_active_inputs(struct device* device) {
-    if (HAS_BIT(device->evtbit, EV_KEY)) {
+    if (HAS_BIT(device->info.evtbit, EV_KEY)) {
         if (TRY(has_active_key(device->entry->stream.fd), -1) == 1)
             return 1;
     }
@@ -91,23 +91,24 @@ err:
     return -1;
 }
 
-int e_get_device_info(int dev_fd, struct device* dev) {
-    memset(dev, 0, sizeof(struct device));
-    dev->stream.fd = dev_fd;
-    CHECK(getrandom(&dev->random_id, sizeof(dev->random_id), 0) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGID, &dev->dev_id) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(dev->name)-1), dev->name) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(dev->evtbit)), dev->evtbit) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_KEY, sizeof(dev->keybit)), dev->keybit) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_ABS, sizeof(dev->absbit)), dev->absbit) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_REL, sizeof(dev->relbit)), dev->relbit) == -1);
-    CHECK(ioctl(dev_fd, EVIOCGPROP(sizeof(dev->propbit)), dev->propbit) == -1);
-    if (!HAS_BIT(dev->evtbit, EV_ABS))
+int e_get_device_info(int dev_fd, struct device* device) {
+    memset(device, 0, sizeof(struct device));
+    device->stream.fd = dev_fd;
+    struct device_info* info = &device->info;
+    CHECK(getrandom(&device->random_id, sizeof(device->random_id), 0) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGID, &info->dev_id) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(info->name)-1), info->name) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(info->evtbit)), info->evtbit) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_KEY, sizeof(info->keybit)), info->keybit) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_ABS, sizeof(info->absbit)), info->absbit) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGBIT(EV_REL, sizeof(info->relbit)), info->relbit) == -1);
+    CHECK(ioctl(dev_fd, EVIOCGPROP(sizeof(info->propbit)), info->propbit) == -1);
+    if (!HAS_BIT(info->evtbit, EV_ABS))
         return 0;
     for (int i = 0; i < ABS_MAX; i++) {
-        if (!HAS_BIT(dev->absbit, i))
+        if (!HAS_BIT(info->absbit, i))
             continue;
-        CHECK(ioctl(dev_fd, EVIOCGABS(i), &dev->absinfo[i]) == -1);
+        CHECK(ioctl(dev_fd, EVIOCGABS(i), &info->absinfo[i]) == -1);
     }
     return 0;
 err:
@@ -129,32 +130,33 @@ err:
 int e_create_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device* new_dev) {
     int u_fd = -1;
     u_fd = TRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK), -1);
+    struct device_info* info = &new_dev->info;
     CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_SYN) == -1);
-    CHECK(set_udev_bits(u_fd, UI_SET_PROPBIT, new_dev->propbit, INPUT_PROP_MAX) == -1);
-    if (HAS_BIT(new_dev->evtbit, EV_KEY)) {
+    CHECK(set_udev_bits(u_fd, UI_SET_PROPBIT, info->propbit, INPUT_PROP_MAX) == -1);
+    if (HAS_BIT(info->evtbit, EV_KEY)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_KEY) == -1);
-        CHECK(set_udev_bits(u_fd, UI_SET_KEYBIT, new_dev->keybit, KEY_MAX) == -1);
+        CHECK(set_udev_bits(u_fd, UI_SET_KEYBIT, info->keybit, KEY_MAX) == -1);
     }
-    if (HAS_BIT(new_dev->evtbit, EV_REL)) {
+    if (HAS_BIT(info->evtbit, EV_REL)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_REL) == -1);
-        CHECK(set_udev_bits(u_fd, UI_SET_RELBIT, new_dev->relbit, REL_MAX) == -1);
+        CHECK(set_udev_bits(u_fd, UI_SET_RELBIT, info->relbit, REL_MAX) == -1);
     }
-    if (HAS_BIT(new_dev->evtbit, EV_ABS)) {
+    if (HAS_BIT(info->evtbit, EV_ABS)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_ABS) == -1);
         for (int i = 0; i < ABS_MAX; i++) {
-            if (!HAS_BIT(new_dev->absbit, i))
+            if (!HAS_BIT(info->absbit, i))
                 continue;
             CHECK(ioctl(u_fd, UI_SET_ABSBIT, i) == -1);
             struct uinput_abs_setup abs_setup = { 0 };
             abs_setup.code = i;
-            abs_setup.absinfo = new_dev->absinfo[i];
+            abs_setup.absinfo = info->absinfo[i];
             CHECK(ioctl(u_fd, UI_ABS_SETUP, &abs_setup) == -1);
         }
     }
     new_dev->stream.fd = u_fd;
-    struct uinput_setup setup = { .id = new_dev->dev_id };
+    struct uinput_setup setup = { .id = info->dev_id };
     char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
-    snprintf(tmp_buff, sizeof(tmp_buff), "(rcn-virt) %s", new_dev->name);
+    snprintf(tmp_buff, sizeof(tmp_buff), "(rcn-virt) %s", info->name);
     strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);

@@ -1,7 +1,7 @@
 #ifndef RCN_RCN_PEER_H
 #define RCN_RCN_PEER_H
 
-#include "rcn_daemon.h"
+#include "rcn_device.h"
 
 enum peer_msg_type {
     PEER_MSG_IDLE,
@@ -27,6 +27,7 @@ struct peer_msg_event {
 };
 
 enum peer_conn_state {
+    PERR_CONN_DISCONNECTED,
     PEER_CONN_PAUSED,
     PEER_CONN_RESUMED,
 };
