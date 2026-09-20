@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra
-SRCS = ./rcn.c ./rcn_daemon.c ./rcn_server.c ./rcn_client.c ./rcn_relay.c ./rcn_util.c ./rcn_arg.c ./rcn_evdev.c ./rcn_peer.c
+SRCS = ./rcn.c ./rcn_daemon.c ./rcn_server.c ./rcn_client.c ./rcn_relay.c ./rcn_util.c ./rcn_arg.c ./rcn_device.c ./rcn_peer.c ./rcn_stream.c
 TARGET = rcn
 
 all:

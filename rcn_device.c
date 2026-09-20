@@ -63,7 +63,6 @@ int e_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char 
     int dev_fd = TRY(open(dev_path, O_RDONLY | O_NONBLOCK), -1);
     CHECK(e_get_device_info(dev_fd, out_dev) == -1);
     CHECK(u_array_add(&devices->r, out_dev) == -1);
-    CHECK(d_epoll_add_device(ep_ctx, out_dev) == -1);
     return 0;
 err:
     out_dev = NULL;

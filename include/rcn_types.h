@@ -8,19 +8,28 @@ U_DEFINE_ARR(device_arr, struct device);
 U_DEFINE_ARR(relay_arr, struct relay);
 U_DEFINE_ARR(char_arr, char);
 
+typedef int stream_header_t;
+
 enum stream_state {
-    D_STREAM_WRITING,
-    D_STREAM_READING,
-    D_STREAM_COMPLETE,
-    D_STREAM_CLOSED,
+    STREAM_STREAMING,
+    STREAM_COMPLETE,
+    STREAM_CLOSED,
+};
+
+enum stream_operation {
+    STREAM_WRITING,
+    STREAM_READING,
 };
 
 struct stream {
     void* buffer;
     size_t buffer_size;
     size_t buffer_streamed;
-    int fd;
     enum stream_state state;
+    enum stream_operation op;
+    enum stream_operation default_op;
+    int fd;
+    stream_header_t header;
 };
 
 enum fd_type {
@@ -28,6 +37,7 @@ enum fd_type {
     FD_RELAY,
     FD_ISOCK,
     FD_PEER,
+    FD_UDEV,
     FD_DEV,
 };
 
@@ -41,6 +51,11 @@ struct epoll_context {
     int epoll_fd;
     int relay_count;
     int peer_count;
+};
+
+enum daemon_type {
+    DAEMON_SERVER,
+    DAEMON_CLIENT,
 };
 
 #endif //RCN_RCN_TYPES_H

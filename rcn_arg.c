@@ -229,9 +229,9 @@ err:
 
 int subaction_to_rcn_msg(enum subaction_type saction) {
     switch (saction) {
-        case SUBACTION_PAUSE: return RELAY_MSG_PAUSE;
-        case SUBACTION_RESUME: return RELAY_MSG_RESUME;
-        case SUBACTION_STOP: return RELAY_MSG_STOP;
+        case SUBACTION_PAUSE: return RELAY_HEADER_PAUSE;
+        case SUBACTION_RESUME: return RELAY_HEADER_RESUME;
+        case SUBACTION_STOP: return RELAY_HEADER_STOP;
         default:
             ERR_LOG("subaction_to_rcn_msg");
             return -1;

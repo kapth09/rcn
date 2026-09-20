@@ -3,13 +3,13 @@
 
 #include "rcn_daemon.h"
 
-enum relay_msg_type {
-    RELAY_MSG_CONTINUE,
-    RELAY_MSG_START,
-    RELAY_MSG_PAUSE,
-    RELAY_MSG_RESUME,
-    RELAY_MSG_STOP,
-    RELAY_MSG_ERR
+enum relay_msg_header {
+    RELAY_HEADER_IDLE,
+    RELAY_HEADER_AWAIT,
+    RELAY_HEADER_PAUSE,
+    RELAY_HEADER_RESUME,
+    RELAY_HEADER_STOP,
+    RELAY_HEADER_ERR
 };
 
 enum relay_state {
@@ -18,11 +18,11 @@ enum relay_state {
 };
 
 struct relay_msg {
-    enum relay_msg_type type;
+    enum relay_msg_header header;
 };
 
 struct relay_arg {
-    enum relay_msg_type type_sent;
+    enum relay_msg_header header_sent;
     enum daemon_type d_type;
 };
 

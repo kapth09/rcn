@@ -6,7 +6,7 @@
 static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type) {
     struct relay_arg r_arg = {
         .d_type = d_type,
-        .type_sent = TRY(subaction_to_rcn_msg(sa_type), -1),
+        .header_sent = TRY(subaction_to_rcn_msg(sa_type), -1),
     };
     CHECK(r_trigger(r_arg) == -1);
     return 0;

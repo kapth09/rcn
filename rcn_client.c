@@ -70,21 +70,34 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context *h_ctx, struct epoll_entry *entry) {
+static int init_arg_devices(struct epoll_context* ep_ctx, struct device_context* device_ctx, char_arr devices_arg) {
+    for (size_t i = 0; i < devices_arg.r.length; i++) {
+        char *dev_path = NULL;
+        CHECK(u_array_getv(&devices_arg.r, &dev_path, i) == -1);
+        struct device dev = { 0 };
+        CHECK(e_init_device(ep_ctx, &device_ctx->devices, dev_path, &dev) == -1);
+        CHECK(e_grab_device_by_ptr(&dev, true) == -1);
+    }
+    return 0;
+err:
+    return -1;
+}
+
+static int handler_device(struct d_context* d_ctx, struct epoll_entry* entry) {
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_context *h_ctx, struct epoll_entry *entry) {
+static int handler_peer(struct d_context* d_ctx, struct epoll_entry* entry) {
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context *h_ctx, struct epoll_entry *entry) {
+static int handler_relay(struct d_context* d_ctx, struct epoll_entry* entry) {
     return 0;
 err:
     ERR_LOG("handler_relay");
@@ -92,51 +105,52 @@ err:
 }
 
 int c_start(int port, char *host, char_arr devices_arg) {
-    device_arr devices = {};
-    CHECK(u_array_init(&devices.r, sizeof(struct device), devices_arg.r.length) == -1);
-
     struct epoll_context ep_ctx = {};
-    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
+    struct relay_context relay_ctx = {};
+    struct peer_context peer_ctx = {};
+    struct device_context device_ctx = {};
 
     CHECK(d_init_dir() == -1);
+
+    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
+    CHECK(d_init_device_ctx(&device_ctx) == -1);
+
     const int usock_fd = TRY(d_init_usock(RCN_CLIENT_SOCKET_PATH, RCN_CLIENT_SOCKET_LEN), -1);
     CHECK(d_epoll_add(&ep_ctx, usock_fd, FD_USOCK) == -1);
+    CHECK(d_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     const int psock_fd = TRY(init_psock(port, host), -1);
     CHECK(d_epoll_add(&ep_ctx, psock_fd, FD_PEER) == -1);
+    CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, psock_fd) == -1);
 
-    for (size_t i = 0; i < devices_arg.r.length; i++) {
-        char *dev_path = NULL;
-        CHECK(u_array_getv(&devices_arg.r, &dev_path, i) == -1);
-        struct device dev = { 0 };
-        CHECK(e_init_device(&ep_ctx, &devices, dev_path, &dev) == -1);
-        union peer_msg_data data =  { .dev_info = dev };
-        CHECK(d_write_peer(psock_fd, PEER_MSG_DEV_CRT, data) == -1);
-        CHECK(e_grab_device_by_ptr(&dev, true) == -1);
-    }
+    CHECK(init_arg_devices(&ep_ctx, &device_ctx, devices_arg) == -1);
 
     struct daemon_arg d_arg = {
         .d_type = DAEMON_CLIENT,
-        .peer_fd = psock_fd,
-        .ep_ctx = &ep_ctx,
-        .devices = &devices,
         .handlers = {
-            .relay = handler_relay,
-            .peer = handler_peer,
-            .device = handler_device,
+            .peer_handler = handler_peer,
+            .relay_handler = handler_relay,
+            .device_handler = handler_device,
+        },
+        .d_ctx = {
+            .ep_ctx = &ep_ctx,
+            .peer_ctx = &peer_ctx,
+            .relay_ctx = &relay_ctx,
+            .device_ctx = &device_ctx,
+            .exit = false,
         }
     };
     struct relay_arg r_arg = {
-        .type_sent = RELAY_MSG_CONTINUE,
+        .header_sent = RELAY_HEADER_IDLE,
         .d_type =  DAEMON_CLIENT,
     };
     CHECK(u_array_free(&devices_arg.r) == -1);
-    return d_fork(&d_arg, r_trigger, r_arg);
+    return d_fork(&d_arg, r_arg);
 err:
     if (ep_ctx.entries.r.data != NULL)
         u_array_free(&ep_ctx.entries.r);
-    if (devices.r.data != NULL)
-        u_array_free(&devices.r);
+    if (device_ctx.devices.r.data != NULL)
+        u_array_free(&device_ctx.devices.r);
     ERR_LOG("c_start");
     return -1;
 }

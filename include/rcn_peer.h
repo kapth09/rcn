@@ -3,14 +3,14 @@
 
 #include "rcn_device.h"
 
-enum peer_msg_type {
-    PEER_MSG_IDLE,
-    PEER_MSG_DEV_CRT,
-    PEER_MSG_DEV_DEL,
-    PEER_MSG_EVENT,
-    PEER_MSG_PAUSE,
-    PEER_MSG_RESUME,
-    PEER_MSG_STOP,
+enum peer_msg_header {
+    PEER_HEADER_IDLE,
+    PEER_HEADER_DEV_CRT,
+    PEER_HEADER_DEV_DEL,
+    PEER_HEADER_EVENT,
+    PEER_HEADER_PAUSE,
+    PEER_HEADER_RESUME,
+    PEER_HEADER_STOP,
 };
 
 struct peer_msg_dev_crt {
@@ -35,10 +35,10 @@ enum peer_conn_state {
 struct peer_context {
     struct stream stream;
     enum peer_conn_state peer_state;
-    enum peer_msg_type expected_msg;
+    enum peer_msg_header expected_msg;
     int isock_fd;
 };
 
-size_t p_msg_size(enum peer_msg_type msg_type);
+size_t p_msg_size(enum peer_msg_header msg_type);
 
 #endif //RCN_RCN_PEER_H

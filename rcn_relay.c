@@ -12,12 +12,12 @@ struct sock_info {
 };
 
 static const char* relay_text[] = {
-    [RELAY_MSG_CONTINUE] = "",
-    [RELAY_MSG_START] = "started",
-    [RELAY_MSG_PAUSE] = "paused",
-    [RELAY_MSG_RESUME] = "resumed",
-    [RELAY_MSG_STOP] = "stopped",
-    [RELAY_MSG_ERR] = "error",
+    [RELAY_HEADER_IDLE] = "",
+    [RELAY_HEADER_AWAIT] = "started",
+    [RELAY_HEADER_PAUSE] = "paused",
+    [RELAY_HEADER_RESUME] = "resumed",
+    [RELAY_HEADER_STOP] = "stopped",
+    [RELAY_HEADER_ERR] = "error",
 };
 
 static int init_sockinfo(enum daemon_type d_type, struct sock_info* info) {
@@ -55,11 +55,11 @@ int r_trigger(struct relay_arg arg) {
     int usock_fd = TRY(r_init_usock(info.sock_path, info.path_len), -1);
     printf("rcn>");
     fflush(stdout);
-    struct relay_msg msg = { .type = arg.type_sent };
+    struct relay_msg msg = { .header = arg.header_sent };
     CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
     // blocking read on .sock to wait for daemon
     CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
-    printf("\rrcn: %s\n", relay_text[arg.type_sent]);
+    printf("\rrcn: %s\n", relay_text[arg.header_sent]);
     CHECK(c_close_connection(usock_fd) == -1);
     return 0;
 err:
