@@ -3,13 +3,13 @@
 #include <string.h>
 
 /* u_array */
-static int resize(void* data, size_t elm_size, size_t* capacity,size_t extra_elements) {
+static int resize(void** data, size_t elm_size, size_t* capacity,size_t extra_elements) {
     if (data == NULL)
         DO_GOTO(errno = EFAULT, err);
     size_t new_size = (*capacity + extra_elements) * elm_size;
-    void* tmp = realloc(data, new_size);
+    void* tmp = realloc(*data, new_size);
     CHECK(tmp == NULL);
-    data = tmp;
+    *data = tmp;
     *capacity += extra_elements;
     return 0;
 err:
@@ -108,6 +108,23 @@ err:
     return -1;
 }
 
+int u_array_remove_get(struct u_array* arr, void* element, size_t i) {
+    if (arr->data == NULL)
+        DO_GOTO(errno = EFAULT, err);
+    CHECK(arr->length == 0);
+    CHECK(i >= arr->length);
+    void* dest = arr->data + (arr->size * i);
+    memcpy(element, dest, arr->size);
+    void* src = arr->data + (arr->size * (i+1));
+    size_t n = (arr->length - i - 1) * arr->size;
+    memmove(dest, src, n);
+    arr->length--;
+    return 0;
+err:
+    ERR_LOG("u_array_remove_get");
+    return -1;
+}
+
 int u_array_getr(struct u_array* arr, void** element, size_t i) {
     if (arr->data == NULL)
         DO_GOTO(errno = EFAULT, err);
@@ -152,5 +169,53 @@ int u_array_free(struct u_array* arr) {
     return 0;
 err:
     ERR_LOG("u_array_free");
+    return -1;
+}
+
+/* u_queue */
+int u_queue_init(struct u_queue* queue, size_t size, size_t capacity) {
+    CHECK(u_array_init(&queue->data_array, size, capacity) == -1);
+    queue->is_empty = true;
+    return 0;
+err:
+    ERR_LOG("u_queue_init");
+    return -1;
+}
+
+int u_queue_push(struct u_queue* queue, void* element) {
+    CHECK(u_array_add(&queue->data_array, element) == -1);
+    queue->is_empty = false;
+    return 0;
+err:
+    ERR_LOG("u_queue_push");
+    return -1;
+}
+
+int u_queue_peek(struct u_queue* queue, void** element) {
+    CHECK(queue->is_empty);
+    CHECK(u_array_getr(&queue->data_array, element, 0) == -1);
+    return 0;
+err:
+    ERR_LOG("u_queue_peek");
+    return -1;
+}
+
+int u_queue_pop(struct u_queue* queue, void* element) {
+    CHECK(queue->is_empty);
+    CHECK(u_array_remove_get(&queue->data_array, element, 0) == -1);
+    queue->is_empty = queue->data_array.length == 0;
+    return 0;
+err:
+    ERR_LOG("u_queue_pop");
+    return -1;
+}
+
+int u_queue_free(struct u_queue* queue) {
+    CHECK(queue== NULL);
+    free(queue->data_array.data);
+    queue->data_array.data = NULL;
+    return 0;
+err:
+    ERR_LOG("u_queue_free");
     return -1;
 }
