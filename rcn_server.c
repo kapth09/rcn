@@ -44,6 +44,9 @@ err:
 }
 
 static int handler_device(struct d_context* d_ctx, struct epoll_entry* entry) {
+    (void)d_ctx;
+    (void)entry;
+    goto err;
     return 0;
 err:
     ERR_LOG("handler_device");
@@ -51,6 +54,9 @@ err:
 }
 
 static int handler_peer(struct d_context *d_ctx, struct epoll_entry* entry) {
+    (void)d_ctx;
+    (void)entry;
+    goto err;
     return 0;
 err:
     ERR_LOG("handler_peer");
@@ -58,11 +64,12 @@ err:
 }
 
 static int handler_relay(struct d_context* d_ctx, struct epoll_entry* entry) {
+    (void)d_ctx;
     struct stream* stream = &entry->stream;
     switch (stream->header) {
         case RELAY_HEADER_AWAIT: {
             struct relay_msg msg = { .header = RELAY_HEADER_STOP };
-            CHECK(stream_set_writing(stream, sizeof(msg), &msg) == -1);
+            CHECK(stream_queue_writing(stream, sizeof(msg), &msg) == -1);
             break;
         }
         default: ERR_GOTO(err, "err: unknown relay header '%d'", stream->header);
@@ -88,7 +95,7 @@ int s_start(const int port) {
     CHECK(d_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     const int isock_fd = TRY(init_psock(port), -1);
-    CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, isock_fd) == -1);
+    CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, isock_fd, DAEMON_SERVER) == -1);
 
     struct daemon_arg d_arg = {
         .d_type = DAEMON_SERVER,

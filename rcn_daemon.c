@@ -16,7 +16,7 @@
 
 ssize_t d_stream_or_close(struct epoll_context* ep_ctx, struct epoll_entry* entry) {
     const int ret = stream(&entry->stream);
-    if (entry->stream.state == STREAM_CLOSED)
+    if (entry->stream.next->state == STREAM_CLOSED)
         CHECK(d_epoll_close_remove(ep_ctx, entry) == -1);
     CHECK(ret == -1);
     return 0;
@@ -33,17 +33,26 @@ static int accept_isock(struct epoll_context* ep_ctx, const struct stream* strea
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     CHECK(d_epoll_add(ep_ctx, sock_fd, FD_PEER) == -1);
     *peer_fd = sock_fd;
+    return 0;
 err:
     ERR_LOG("accept_isock");
     return -1;
 }
 
-int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd) {
+int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type) {
     p_ctx->isock_fd = isock_fd;
     p_ctx->peer_state = PERR_CONN_DISCONNECTED;
     p_ctx->expected_msg = PEER_HEADER_IDLE;
-    CHECK(stream_set_default(&p_ctx->stream, sizeof(enum peer_msg_header), STREAM_READING) == -1);
-    CHECK(d_epoll_add(ep_ctx, isock_fd, FD_ISOCK) == -1);
+    if (d_type == DAEMON_SERVER) {
+        struct epoll_entry* entry;
+        CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_ISOCK, &entry) == -1);
+        p_ctx->stream = &entry->stream;
+        CHECK(stream_set_default(p_ctx->stream, sizeof(enum peer_msg_header), STREAM_READING) == -1);
+    } else if (d_type == DAEMON_CLIENT) {
+        struct epoll_entry* entry;
+        CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_PEER, &entry) == -1);
+        p_ctx->stream = &entry->stream;
+    }
     return 0;
 err:
     ERR_LOG("d_init_peer_ctx");
@@ -121,7 +130,7 @@ int d_init_log(enum daemon_type d_type) {
         log_path = RCN_CLIENT_LOG_PATH;
     CHECK(log_path == NULL);
     CHECK(freopen(log_path, "w", stdout) == NULL);
-    CHECK(freopen(log_path, "w", stderr) == NULL);
+    CHECK(freopen(log_path, "a", stderr) == NULL);
     CHECK(setvbuf(stdout, NULL, _IONBF, 0) != 0);
     CHECK(setvbuf(stderr, NULL, _IONBF, 0) != 0);
     return 0;
@@ -140,7 +149,7 @@ err:
 }
 
 int d_epoll_entry_sync_stream(struct epoll_context* ep_ctx, struct epoll_entry* entry, struct stream* stream) {
-    enum EPOLL_EVENTS events = stream->op == STREAM_WRITING ? EPOLLOUT : EPOLLIN;
+    enum EPOLL_EVENTS events = stream->next->op == STREAM_WRITING ? EPOLLOUT : EPOLLIN;
     struct epoll_event evt = {
         .data.ptr = entry,
         .events = events,
@@ -176,10 +185,35 @@ err:
     return -1;
 }
 
-int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
+int d_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_entry** out_entry) {
     struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
     entry->type = type;
-    CHECK(stream_setup(&entry->stream, fd, type) == -1);
+    CHECK(stream_init(&entry->stream, fd, type) == -1);
+    CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
+    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry, };
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
+    CHECK(epoll_counter_update(ep_ctx, type, 1) == -1);
+    *out_entry = entry;
+    return 0;
+err:
+    ERR_LOG("d_epoll_add");
+    return -1;
+}
+
+int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
+    struct epoll_entry* tmp_entry;
+    CHECK(d_epoll_add_getr(ep_ctx, fd, type, &tmp_entry) == -1);
+    return 0;
+err:
+    ERR_LOG("d_epoll_add");
+    return -1;
+}
+
+int d_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* device, enum fd_type type) {
+    struct epoll_entry* entry = TRY(calloc(1, sizeof(struct epoll_entry)), NULL);
+    entry->type = type;
+    device->entry = entry;
+    CHECK(stream_init(&entry->stream, fd, type) == -1);
     CHECK(u_array_add(&ep_ctx->entries.r, &entry) == -1);
     struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = entry, };
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
@@ -195,7 +229,7 @@ int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_entry* entry
     size_t index = TRY(u_array_find_index(&ep_ctx->entries.r, &entry), -1);
     CHECK(u_array_remove(&ep_ctx->entries.r, index) == -1);
     CHECK(epoll_counter_update(ep_ctx, entry->type, -1) == -1);
-    close(entry->stream.fd);
+    CHECK(stream_close(&entry->stream) == -1);
     free(entry);
     return 0;
 err:
@@ -204,9 +238,9 @@ err:
     return -1;
 }
 
-int epoll_reset_stream(struct epoll_context* ep_ctx, struct epoll_entry* entry) {
+static int epoll_reset_stream(struct epoll_context* ep_ctx, struct epoll_entry* entry) {
+    CHECK(stream_clear_fallback(&entry->stream) == -1);
     CHECK(d_epoll_entry_sync_stream(ep_ctx, entry, &entry->stream) == -1);
-    CHECK(stream_clear(&entry->stream) == -1);
     return 0;
 err:
     ERR_LOG("epoll_reset_stream");
@@ -276,18 +310,20 @@ err:
     return -1;
 }
 
-static int resolve_fd_context(struct d_context* d_ctx, struct epoll_handlers handlers, struct epoll_event* epoll_buff, int fd_count) {
+static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers handlers, struct epoll_event* epoll_buff, int fd_count) {
     for (int i = 0; i < fd_count; i++) {
         struct epoll_event evt = epoll_buff[i];
         struct epoll_entry* entry = evt.data.ptr;
         struct stream* stream = &entry->stream;
-        if (stream->state != STREAM_COMPLETE) {
+        struct stream_data* stream_data = stream->next;
+        if (stream_data->state != STREAM_COMPLETE || stream_data->state == STREAM_CLOSED) {
             continue;
         }
         if (stream->header == -1) {
             CHECK(stream_header(stream) == -1);
         }
-        if (stream->op != stream->default_op) {
+        CHECK(stream_collect(stream, &stream_data) == -1);
+        if (stream_data->op != stream->default_op) {
             CHECK(epoll_reset_stream(d_ctx->ep_ctx, entry) == -1);
             continue;
         }
@@ -322,7 +358,7 @@ int d_loop(struct d_context* d_ctx, struct epoll_handlers handlers) {
         const size_t fd_count = ep_ctx->entries.r.length;
         struct epoll_event epoll_buff[fd_count];
         const int nfds = TRY(dispatch_epoll(ep_ctx, epoll_buff, fd_count), -1);
-        CHECK(resolve_fd_context(d_ctx, handlers, epoll_buff, nfds) == -1);
+        CHECK(resolve_fd_streams(d_ctx, handlers, epoll_buff, nfds) == -1);
     }
     return 0;
 err:

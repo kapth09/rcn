@@ -59,8 +59,8 @@ int r_trigger(struct relay_arg arg) {
     CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
     // blocking read on .sock to wait for daemon
     CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
-    printf("\rrcn: %s\n", relay_text[arg.header_sent]);
     CHECK(c_close_connection(usock_fd) == -1);
+    printf("\rrcn: %s\n", relay_text[arg.header_sent]);
     return 0;
 err:
     ERR_LOG("r_await");
