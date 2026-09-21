@@ -1,10 +1,10 @@
 #include "include/rcn.h"
 #include "include/rcn_relay.h"
-#include <stdio.h>
-#include <fcntl.h>
-#include <unistd.h>
+#include "include/rcn_types.h"
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 struct sock_info {
     char* sock_path;
@@ -55,12 +55,12 @@ int r_trigger(struct relay_arg arg) {
     int usock_fd = TRY(r_init_usock(info.sock_path, info.path_len), -1);
     printf("rcn>");
     fflush(stdout);
-    struct relay_msg msg = { .header = arg.header_sent };
+    struct stream_header msg = { .value = arg.header_sent, .size = 0};
     CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
     // blocking read on .sock to wait for daemon
     CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
     CHECK(c_close_connection(usock_fd) == -1);
-    printf("\rrcn: %s\n", relay_text[arg.header_sent]);
+    printf("\rrcn: %s\n", relay_text[msg.value]);
     return 0;
 err:
     ERR_LOG("r_await");

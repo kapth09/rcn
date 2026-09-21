@@ -10,11 +10,6 @@ enum relay_msg_header {
     RELAY_HEADER_ERR
 };
 
-enum relay_state {
-    RELAY_AWAIT,
-    RELAY_SLEEP,
-};
-
 struct relay_msg {
     enum relay_msg_header header;
 };
@@ -24,13 +19,8 @@ struct relay_arg {
     enum daemon_type d_type;
 };
 
-struct relay {
-    struct epoll_stream stream;
-    enum relay_state state;
-};
-
 struct relay_context {
-    relay_arr relays;
+    epoll_stream_arr relay_streams;
     int usock_fd;
 };
 

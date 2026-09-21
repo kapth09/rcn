@@ -45,7 +45,7 @@ int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, in
     p_ctx->expected_msg = PEER_HEADER_IDLE;
     if (d_type == DAEMON_SERVER) {
         CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_ISOCK, &p_ctx->stream) == -1);
-        CHECK(stream_set_default(p_ctx->stream, sizeof(enum peer_msg_header), STREAM_READING) == -1);
+        CHECK(stream_set_default(p_ctx->stream, STREAM_READING) == -1);
     } else if (d_type == DAEMON_CLIENT) {
         CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_PEER, &p_ctx->stream) == -1);
     }
@@ -55,13 +55,15 @@ err:
     return -1;
 }
 
-static int accept_usock(struct epoll_context* ep_ctx, const struct epoll_stream* stream) {
+static int accept_usock(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, const struct epoll_stream* stream) {
     struct sockaddr_un r_uaddr = {};
     struct sockaddr* addr = (struct sockaddr*)&r_uaddr;
     socklen_t addr_len = sizeof(r_uaddr);
     int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
-    CHECK(d_epoll_add(ep_ctx, sock_fd, FD_RELAY) == -1);
+    struct epoll_stream* relay_stream;
+    CHECK(d_epoll_add_getr(ep_ctx, sock_fd, FD_RELAY, &relay_stream) == -1);
+    CHECK(u_array_add(&relay_streams->r, &relay_stream) == -1);
     return 0;
 err:
     ERR_LOG("accept_usock");
@@ -70,11 +72,23 @@ err:
 
 int d_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd) {
     r_ctx->usock_fd = usock_fd;
-    CHECK(u_array_init(&r_ctx->relays.r, sizeof(struct relay), RCN_STD_CAPACITY) == -1);
+    CHECK(u_array_init(&r_ctx->relay_streams.r, sizeof(struct relay*), RCN_STD_CAPACITY) == -1);
     CHECK(d_epoll_add(ep_ctx, usock_fd, FD_USOCK) == -1);
     return 0;
 err:
     ERR_LOG("d_init_relay_ctx");
+    return -1;
+}
+
+int d_broacast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header) {
+    for (size_t i = 0; i < relay_streams->r.length; i++) {
+        struct epoll_stream* relay_stream = {};
+        CHECK(u_array_getv(&relay_streams->r, &relay_stream, i) == -1);
+        CHECK(stream_queue_writing(ep_ctx, relay_stream, RELAY_HEADER_PAUSE, 0, NULL) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("d_broadcast_relay_header");
     return -1;
 }
 
@@ -226,7 +240,7 @@ int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_stream* stre
     CHECK(u_array_remove(&ep_ctx->stream_ptrs.r, index) == -1);
     CHECK(epoll_counter_update(ep_ctx, stream->fd_type, -1) == -1);
     CHECK(stream_close(stream) == -1);
-    free(stream);
+    u_safe_free((void**)&stream);
     return 0;
 err:
     close(stream->fd);
@@ -268,19 +282,19 @@ static int can_exit(struct d_context* h_ctx) {
     return 1;
 }
 
-static int dispatch_epoll(struct epoll_context* ep_ctx, struct epoll_event* epoll_buff, size_t fd_count) {
+static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buff, size_t fd_count) {
+    struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     int nfds = TRY(epoll_wait(ep_ctx->epoll_fd, epoll_buff, fd_count, -1), -1);
     for (int i = 0; i < nfds; i++) {
         struct epoll_event evt = epoll_buff[i];
         struct epoll_stream* stream = evt.data.ptr;
         switch (stream->fd_type) {
             case FD_USOCK: {
-                CHECK(accept_usock(ep_ctx, stream) == -1);
+                CHECK(accept_usock(ep_ctx, &d_ctx->relay_ctx->relay_streams, stream) == -1);
                 break;
             }
             case FD_ISOCK: {
-                struct peer_context* p_ctx = (struct peer_context*)stream;
-                CHECK(accept_isock(ep_ctx, stream, &p_ctx->isock_fd) == -1);
+                CHECK(accept_isock(ep_ctx, stream, &d_ctx->peer_ctx->isock_fd) == -1);
                 break;
             }
             case FD_PEER: {
@@ -310,29 +324,26 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers han
     for (int i = 0; i < fd_count; i++) {
         struct epoll_event evt = epoll_buff[i];
         struct epoll_stream* stream = evt.data.ptr;
-        struct stream_data* stream_data = stream->next;
-        if (stream_data->state != STREAM_COMPLETE || stream_data->state == STREAM_CLOSED) {
+        struct stream_item* stream_item = stream->next;
+        if (stream_item->state != STREAM_COMPLETE || stream_item->state == STREAM_CLOSED) {
             continue;
         }
-        if (stream->header == -1 && (stream->fd_type == FD_PEER || stream->fd_type == FD_RELAY)) {
-            CHECK(stream_header(stream) == -1);
-        }
-        CHECK(stream_collect(stream, &stream_data) == -1);
-        if (stream_data->op != stream->default_op) {
+        CHECK(stream_collect(stream, &stream_item) == -1);
+        if (stream_item->op != stream->default_op) {
             CHECK(epoll_reset_stream(d_ctx->ep_ctx, stream) == -1);
             continue;
         }
         switch (stream->fd_type) {
             case FD_PEER: {
-                CHECK(handlers.peer_handler(d_ctx, stream) == -1);
+                CHECK(handlers.peer_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_RELAY: {
-                CHECK(handlers.relay_handler(d_ctx, stream) == -1);
+                CHECK(handlers.relay_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_DEV: {
-                CHECK(handlers.device_handler(d_ctx, stream) == -1);
+                CHECK(handlers.device_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_ISOCK: return 0;
@@ -352,7 +363,7 @@ int d_loop(struct d_context* d_ctx, struct epoll_handlers handlers) {
     while (can_exit(d_ctx) == false) {
         const size_t fd_count = ep_ctx->stream_ptrs.r.length;
         struct epoll_event epoll_buff[fd_count];
-        const int nfds = TRY(dispatch_epoll(ep_ctx, epoll_buff, fd_count), -1);
+        const int nfds = TRY(dispatch_epoll(d_ctx, epoll_buff, fd_count), -1);
         CHECK(resolve_fd_streams(d_ctx, handlers, epoll_buff, nfds) == -1);
     }
     return 0;

@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* u_misc */
+
+void u_safe_free(void** ptr) {
+    free(*ptr);
+    *ptr = NULL;
+}
+
 /* u_array */
 static int resize(void** data, size_t elm_size, size_t* capacity,size_t extra_elements) {
     if (data == NULL)
@@ -165,8 +172,7 @@ err:
 
 int u_array_free(struct u_array* arr) {
     CHECK(arr == NULL);
-    free(arr->data);
-    arr->data = NULL;
+    u_safe_free(&arr->data);
     return 0;
 err:
     ERR_LOG("u_array_free");
@@ -213,8 +219,7 @@ err:
 
 int u_queue_free(struct u_queue* queue) {
     CHECK(queue== NULL);
-    free(queue->data_array.data);
-    queue->data_array.data = NULL;
+    u_safe_free(&queue->data_array.data);
     return 0;
 err:
     ERR_LOG("u_queue_free");

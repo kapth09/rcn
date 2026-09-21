@@ -26,7 +26,7 @@ err:
     return -1;
 }
 
-static int emit_event(device_arr *devices, struct peer_msg_event event) {
+static int emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
     struct device *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
@@ -43,33 +43,34 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream) {
+static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
+    (void)stream_item;
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_context *d_ctx, struct epoll_stream* stream) {
+static int handler_peer(struct d_context *d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
+    (void)stream_item;
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
+static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
-    switch (stream->header) {
+    switch (stream_item->msg.header.value) {
         case RELAY_HEADER_AWAIT: {
-            struct relay_msg msg = { .header = RELAY_HEADER_STOP };
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, sizeof(msg), &msg) == -1);
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_AWAIT, 0, NULL) == -1);
             break;
         }
-        default: ERR_GOTO(err, "err: unknown relay header '%d'", stream->header);
+        default: ERR_GOTO(err, "err: unknown relay header '%d'", stream_item->msg.header.value);
     }
     return 0;
 err:

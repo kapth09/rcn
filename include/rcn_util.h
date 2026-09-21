@@ -25,6 +25,9 @@ typedef struct {                    \
     struct u_queue r;               \
 } (name);
 
+/* rcn_util.c, u_misc */
+void u_safe_free(void** ptr);
+
 /* rcn_util.c, u_array */
 struct u_array u_array_create(size_t size, size_t capacity);
 int u_array_init(struct u_array* arr, size_t size, size_t capacity);

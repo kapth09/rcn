@@ -18,7 +18,7 @@ struct d_context {
     bool exit;
 };
 
-typedef typeof(int(struct d_context* d_ctx, struct epoll_stream* stream)) *epoll_handler_t;
+typedef typeof(int(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item)) *epoll_handler_t;
 
 struct epoll_handlers {
     epoll_handler_t peer_handler;
@@ -39,6 +39,7 @@ int d_init_usock(char* sock_path, size_t path_len);
 int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type);
 int d_init_device_ctx(struct device_context* d_ctx);
 int d_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
+int d_broacast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int d_init_epoll_ctx(struct epoll_context* ep_ctx);
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type);
 int d_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream);

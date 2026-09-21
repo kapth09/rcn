@@ -81,9 +81,7 @@ static int init_arg_devices(struct epoll_context* ep_ctx, struct epoll_stream* p
         struct device dev = {};
         CHECK(e_init_device(ep_ctx, &device_ctx->devices, dev_path, &dev) == -1);
         CHECK(e_grab_device_by_ptr(&dev, true) == -1);
-        enum peer_msg_header header = PEER_HEADER_DEV_CRT;
-        CHECK(stream_queue_writing(ep_ctx, peer_stream, sizeof(header), &header) == -1);
-        CHECK(stream_queue_writing(ep_ctx, peer_stream, sizeof(dev), &dev) == -1);
+        CHECK(stream_queue_writing(ep_ctx, peer_stream, PEER_HEADER_DEV_CRT, sizeof(dev), &dev) == -1);
     }
     return 0;
 err:
@@ -91,28 +89,30 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream) {
+static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
+    (void)stream_item;
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_context* d_ctx, struct epoll_stream* stream) {
+static int handler_peer(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
+    (void)stream_item;
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
+static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
-    enum relay_msg_header header = (enum relay_msg_header)stream->header;
-    switch (header) {
+    (void)stream;
+    switch (stream_item->msg.header.value) {
         case RELAY_HEADER_IDLE: {
             break;
         }
@@ -120,19 +120,15 @@ static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
             break;
         }
         case RELAY_HEADER_PAUSE: {
-            printf("pause from relay\n");
-            enum peer_msg_header peer_header = PEER_HEADER_PAUSE;
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, sizeof(peer_header), &peer_header) == -1);
-            enum relay_msg_header relay_header = RELAY_HEADER_STOP;
-            relay_arr* relays = &d_ctx->relay_ctx->relays;
-            for (size_t i = 0; i < relays->r.length; i++) {
-                struct relay* r;
-                CHECK(u_array_getr(&relays->r, (void**)&r, i) == -1);
-                CHECK(stream_queue_writing(d_ctx->ep_ctx, &r->stream, sizeof(relay_header), &relay_header) == -1);
-            }
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
+            epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
+            CHECK(d_broacast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
             break;
         }
         case RELAY_HEADER_RESUME: {
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_RESUME, 0, NULL) == -1);
+            epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
+            CHECK(d_broacast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
             break;
         }
         case RELAY_HEADER_STOP: {
@@ -141,7 +137,7 @@ static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
         case RELAY_HEADER_ERR: {
             break;
         }
-        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream->header);
+        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->msg.header.value);
     }
     return 0;
 err:
@@ -166,7 +162,7 @@ int c_start(int port, char *host, char_arr devices_arg) {
     const int psock_fd = TRY(init_psock(port, host), -1);
     CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, psock_fd, DAEMON_CLIENT) == -1);
 
-    CHECK(init_arg_devices(&ep_ctx, peer_ctx.stream, &device_ctx, devices_arg) == -1);
+    // CHECK(init_arg_devices(&ep_ctx, peer_ctx.stream, &device_ctx, devices_arg) == -1);
 
     struct daemon_arg d_arg = {
         .d_type = DAEMON_CLIENT,

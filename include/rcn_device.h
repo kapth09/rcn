@@ -33,13 +33,13 @@ struct device {
 };
 
 struct device_context {
-    device_arr devices;
+    device_ptr_arr devices;
 };
 
-int e_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device* out_dev);
-int e_grab_device_by_id(device_arr* devices, size_t random_id, bool grab);
+int e_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev);
+int e_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
 int e_grab_device_by_ptr(struct device* dev, bool grab);
 int e_get_device_info(int dev_fd, struct device* dev);
-int e_create_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device* new_dev);
+int e_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
 
 #endif //RCN_RCN_DEV_H
