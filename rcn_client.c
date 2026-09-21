@@ -1,15 +1,17 @@
 #include "include/rcn.h"
+#include "include/rcn_types.h"
 #include "include/rcn_daemon.h"
-#include <unistd.h>
+#include "include/rcn_peer.h"
+#include "include/rcn_relay.h"
+#include "include/rcn_stream.h"
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <sys/un.h>
-#include <sys/socket.h>
-#include <sys/epoll.h>
-#include <arpa/inet.h>
 #include <netinet/tcp.h>
-
-#include "include/rcn_stream.h"
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 int c_close_connection(int fd) {
     int flags = TRY(fcntl(fd, F_GETFL, 0), -1);
@@ -72,7 +74,7 @@ err:
     return -1;
 }
 
-static int init_arg_devices(struct epoll_context* ep_ctx, struct stream* peer_stream, struct device_context* device_ctx, char_arr devices_arg) {
+static int init_arg_devices(struct epoll_context* ep_ctx, struct epoll_stream* peer_stream, struct device_context* device_ctx, char_arr devices_arg) {
     for (size_t i = 0; i < devices_arg.r.length; i++) {
         char *dev_path = NULL;
         CHECK(u_array_getv(&devices_arg.r, &dev_path, i) == -1);
@@ -80,8 +82,8 @@ static int init_arg_devices(struct epoll_context* ep_ctx, struct stream* peer_st
         CHECK(e_init_device(ep_ctx, &device_ctx->devices, dev_path, &dev) == -1);
         CHECK(e_grab_device_by_ptr(&dev, true) == -1);
         enum peer_msg_header header = PEER_HEADER_DEV_CRT;
-        CHECK(stream_queue_writing(peer_stream, sizeof(header), &header) == -1);
-        CHECK(stream_queue_writing(peer_stream, sizeof(dev), &dev) == -1);
+        CHECK(stream_queue_writing(ep_ctx, peer_stream, sizeof(header), &header) == -1);
+        CHECK(stream_queue_writing(ep_ctx, peer_stream, sizeof(dev), &dev) == -1);
     }
     return 0;
 err:
@@ -89,30 +91,58 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_entry* entry) {
+static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    (void)entry;
-    goto err;
+    (void)stream;
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_context* d_ctx, struct epoll_entry* entry) {
+static int handler_peer(struct d_context* d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    (void)entry;
-    goto err;
+    (void)stream;
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context* d_ctx, struct epoll_entry* entry) {
+static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    (void)entry;
-    goto err;
+    enum relay_msg_header header = (enum relay_msg_header)stream->header;
+    switch (header) {
+        case RELAY_HEADER_IDLE: {
+            break;
+        }
+        case RELAY_HEADER_AWAIT: {
+            break;
+        }
+        case RELAY_HEADER_PAUSE: {
+            printf("pause from relay\n");
+            enum peer_msg_header peer_header = PEER_HEADER_PAUSE;
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, sizeof(peer_header), &peer_header) == -1);
+            enum relay_msg_header relay_header = RELAY_HEADER_STOP;
+            relay_arr* relays = &d_ctx->relay_ctx->relays;
+            for (size_t i = 0; i < relays->r.length; i++) {
+                struct relay* r;
+                CHECK(u_array_getr(&relays->r, (void**)&r, i) == -1);
+                CHECK(stream_queue_writing(d_ctx->ep_ctx, &r->stream, sizeof(relay_header), &relay_header) == -1);
+            }
+            break;
+        }
+        case RELAY_HEADER_RESUME: {
+            break;
+        }
+        case RELAY_HEADER_STOP: {
+            break;
+        }
+        case RELAY_HEADER_ERR: {
+            break;
+        }
+        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream->header);
+    }
     return 0;
 err:
     ERR_LOG("handler_relay");
@@ -160,8 +190,8 @@ int c_start(int port, char *host, char_arr devices_arg) {
     CHECK(u_array_free(&devices_arg.r) == -1);
     return d_fork(&d_arg, r_arg);
 err:
-    if (ep_ctx.entries.r.data != NULL)
-        u_array_free(&ep_ctx.entries.r);
+    if (ep_ctx.stream_ptrs.r.data != NULL)
+        u_array_free(&ep_ctx.stream_ptrs.r);
     if (device_ctx.devices.r.data != NULL)
         u_array_free(&device_ctx.devices.r);
     ERR_LOG("c_start");

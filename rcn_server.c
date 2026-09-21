@@ -43,33 +43,30 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_entry* entry) {
+static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    (void)entry;
-    goto err;
+    (void)stream;
     return 0;
 err:
     ERR_LOG("handler_device");
     return -1;
 }
 
-static int handler_peer(struct d_context *d_ctx, struct epoll_entry* entry) {
+static int handler_peer(struct d_context *d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    (void)entry;
-    goto err;
+    (void)stream;
     return 0;
 err:
     ERR_LOG("handler_peer");
     return -1;
 }
 
-static int handler_relay(struct d_context* d_ctx, struct epoll_entry* entry) {
+static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream) {
     (void)d_ctx;
-    struct stream* stream = &entry->stream;
     switch (stream->header) {
         case RELAY_HEADER_AWAIT: {
             struct relay_msg msg = { .header = RELAY_HEADER_STOP };
-            CHECK(stream_queue_writing(stream, sizeof(msg), &msg) == -1);
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, sizeof(msg), &msg) == -1);
             break;
         }
         default: ERR_GOTO(err, "err: unknown relay header '%d'", stream->header);
@@ -118,8 +115,8 @@ int s_start(const int port) {
     };
     return d_fork(&d_arg, r_arg);
 err:
-    if (ep_ctx.entries.r.data != NULL)
-        u_array_free(&ep_ctx.entries.r);
+    if (ep_ctx.stream_ptrs.r.data != NULL)
+        u_array_free(&ep_ctx.stream_ptrs.r);
     if (device_ctx.devices.r.data != NULL)
         u_array_free(&device_ctx.devices.r);
     ERR_LOG("s_start");

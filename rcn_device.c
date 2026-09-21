@@ -24,7 +24,7 @@ err:
 
 static int has_any_active_inputs(struct device* device) {
     if (HAS_BIT(device->info.evtbit, EV_KEY)) {
-        if (TRY(has_active_key(device->entry->stream.fd), -1) == 1)
+        if (TRY(has_active_key(device->stream.fd), -1) == 1)
             return 1;
     }
     return 0;

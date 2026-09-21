@@ -27,10 +27,9 @@ struct device_info {
 };
 
 struct device {
-    struct stream stream;
-    size_t random_id;
-    struct epoll_entry* entry;
     struct device_info info;
+    struct epoll_stream stream;
+    size_t random_id;
 };
 
 struct device_context {

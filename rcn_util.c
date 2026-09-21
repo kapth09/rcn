@@ -156,6 +156,7 @@ ssize_t u_array_find_index(struct u_array* arr, void* element) {
         if (memcmp(offset, element, arr->size) == 0)
             return (ssize_t)i;
     }
+    ERR_LOG("u_array_find_index");
     return -1;
 err:
     ERR_LOG("u_array_find_index");

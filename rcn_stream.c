@@ -7,7 +7,9 @@
 #include <string.h>
 #include <unistd.h>
 
-int stream_init(struct stream* stream, int fd, enum fd_type type) {
+#include "include/rcn_daemon.h"
+
+int stream_init(struct epoll_stream* stream, int fd, enum fd_type type) {
     stream->fd = fd;
     stream->header = -1;
     stream->next = &stream->fallback;
@@ -26,7 +28,7 @@ err:
     return -1;
 }
 
-int stream_queue_reading(struct stream* stream, size_t size) {
+int stream_queue_reading(struct epoll_stream* stream, size_t size) {
     struct stream_data stream_data = {
         .state = STREAM_STREAMING,
         .op = STREAM_READING,
@@ -44,7 +46,7 @@ err:
     return -1;
 }
 
-int stream_queue_writing(struct stream* stream, size_t size, void* data) {
+int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stream, size_t size, void* data) {
     struct stream_data stream_data = {
         .state = STREAM_STREAMING,
         .op = STREAM_WRITING,
@@ -57,13 +59,14 @@ int stream_queue_writing(struct stream* stream, size_t size, void* data) {
     CHECK(u_queue_push(&stream->queue.r, &stream_data) == -1);
     if (was_empty)
         CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
+    CHECK(d_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
     ERR_LOG("stream_set_writing");
     return -1;
 }
 
-int stream_set_default(struct stream* stream, size_t size, enum stream_operation default_op) {
+int stream_set_default(struct epoll_stream* stream, size_t size, enum stream_operation default_op) {
     struct stream_data* stream_data = &stream->fallback;
     if (stream_data->buffer != NULL && stream_data->buffer_size != size)
         free(stream_data->buffer);
@@ -80,7 +83,7 @@ err:
     return -1;
 }
 
-int stream_clear_fallback(struct stream* stream) {
+int stream_clear_fallback(struct epoll_stream* stream) {
     CHECK(stream_set_default(stream, stream->fallback.buffer_size, stream->default_op) == -1);
     return 0;
 err:
@@ -88,14 +91,14 @@ err:
     return -1;
 }
 
-int stream_header(struct stream* stream) {
+int stream_header(struct epoll_stream* stream) {
     struct stream_data* stream_data = stream->next;
     if (stream_data->state != STREAM_COMPLETE)
         ERR_GOTO(err, "err: stream is not complete");
     if (stream->header != -1)
         ERR_GOTO(err, "err: stream header already set");
     if (stream_data->buffer_size != sizeof(stream->header))
-        ERR_GOTO(err, "err: streamed header is not size of field 'header'");
+        ERR_GOTO(err, "err: streamed header is not size of field 'header': \n");
     const int header = *(int*)stream_data->buffer;
     stream->header = header;
     return 0;
@@ -104,7 +107,7 @@ err:
     return -1;
 }
 
-int stream(struct stream* stream) {
+int stream_stream(struct epoll_stream* stream) {
     struct stream_data* stream_data = stream->next;
     uintptr_t buffer_offset = (uintptr_t)stream_data->buffer + stream_data->buffer_streamed;
     size_t size_offset = stream_data->buffer_size - stream_data->buffer_streamed;
@@ -136,7 +139,7 @@ err:
     return -1;
 }
 
-int stream_collect(struct stream* stream, struct stream_data** stream_data) {
+int stream_collect(struct epoll_stream* stream, struct stream_data** stream_data) {
     *stream_data = &stream->fallback;
     if (stream->queue.r.is_empty == false) {
         CHECK(u_queue_pop(&stream->queue.r, *stream_data) == -1);
@@ -151,7 +154,7 @@ err:
     return -1;
 }
 
-int stream_close(struct stream* stream) {
+int stream_close(struct epoll_stream* stream) {
     while (stream->queue.r.is_empty == false) {
         struct stream_data* stream_data = NULL;
         CHECK(u_queue_pop(&stream->queue.r, stream_data) == -1);

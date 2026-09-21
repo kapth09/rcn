@@ -1,8 +1,6 @@
 #ifndef RCN_RCN_RELAY_H
 #define RCN_RCN_RELAY_H
 
-#include "rcn_daemon.h"
-
 enum relay_msg_header {
     RELAY_HEADER_IDLE,
     RELAY_HEADER_AWAIT,
@@ -27,7 +25,7 @@ struct relay_arg {
 };
 
 struct relay {
-    struct stream stream;
+    struct epoll_stream stream;
     enum relay_state state;
 };
 

@@ -33,7 +33,7 @@ enum peer_conn_state {
 };
 
 struct peer_context {
-    struct stream* stream;  // pointer to the epoll_entry's stream for easier access
+    struct epoll_stream* stream;  // pointer to the epoll_entry's stream for easier access
     enum peer_conn_state peer_state;
     enum peer_msg_header expected_msg;
     int isock_fd;
