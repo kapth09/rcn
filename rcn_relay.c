@@ -66,3 +66,11 @@ err:
     ERR_LOG("r_await");
     return -1;
 }
+
+int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream) {
+    size_t index = TRY(u_array_find_index(&r_ctx->relay_streams.r, &stream), -1);
+    CHECK(u_array_remove(&r_ctx->relay_streams.r, index) == -1);
+    return 0;
+err:
+    return -1;
+}

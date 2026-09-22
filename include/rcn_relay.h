@@ -29,5 +29,6 @@ typedef typeof(int(struct relay_arg arg)) *r_handler_t;
 /* rcn_relay.c */
 int r_init_usock(char* sock_path, size_t path_len);
 int r_trigger(struct relay_arg arg);
+int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream);
 
 #endif //RCN_RCN_RELAY_H

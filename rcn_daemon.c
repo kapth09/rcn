@@ -14,10 +14,11 @@
 
 #define DEFAULT_USOCK_COUNT 3
 
-ssize_t d_stream_or_close(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
+ssize_t d_stream_or_close(struct d_context* d_ctx, struct epoll_stream* stream) {
     const int ret = stream_stream(stream);
-    if (stream->next->state == STREAM_CLOSED)
-        CHECK(d_epoll_close_remove(ep_ctx, stream) == -1);
+    if (stream->next->state == STREAM_CLOSED) {
+        CHECK(d_epoll_close_remove(d_ctx, stream) == -1);
+    }
     CHECK(ret == -1);
     return 0;
 err:
@@ -80,11 +81,11 @@ err:
     return -1;
 }
 
-int d_broacast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header) {
+int d_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header header) {
     for (size_t i = 0; i < relay_streams->r.length; i++) {
         struct epoll_stream* relay_stream = {};
         CHECK(u_array_getv(&relay_streams->r, &relay_stream, i) == -1);
-        CHECK(stream_queue_writing(ep_ctx, relay_stream, RELAY_HEADER_PAUSE, 0, NULL) == -1);
+        CHECK(stream_queue_writing(ep_ctx, relay_stream, header, 0, NULL) == -1);
     }
     return 0;
 err:
@@ -234,7 +235,14 @@ err:
     return -1;
 }
 
-int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
+int d_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
+    switch (stream->fd_type) {
+        case FD_RELAY: r_close_relay(d_ctx->relay_ctx, stream); break;
+        case FD_DEV: e_close_dev(d_ctx->device_ctx, stream); break;
+        case FD_PEER: p_close_peer_ctx(d_ctx->peer_ctx); break;
+        default: ERR_GOTO(err, "err: unknown fd_type\n");
+    }
+    struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL) == -1);
     size_t index = TRY(u_array_find_index(&ep_ctx->stream_ptrs.r, &stream), -1);
     CHECK(u_array_remove(&ep_ctx->stream_ptrs.r, index) == -1);
@@ -298,15 +306,15 @@ static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buf
                 break;
             }
             case FD_PEER: {
-                CHECK(d_stream_or_close(ep_ctx, stream) == -1);
+                CHECK(d_stream_or_close(d_ctx, stream) == -1);
                 break;
             }
             case FD_RELAY: {
-                CHECK(d_stream_or_close(ep_ctx, stream) == -1);
+                CHECK(d_stream_or_close(d_ctx, stream) == -1);
                 break;
             }
             case FD_DEV: {
-                CHECK(d_stream_or_close(ep_ctx, stream) == -1);
+                CHECK(d_stream_or_close(d_ctx, stream) == -1);
                 break;
             }
             case FD_UDEV: {
@@ -350,7 +358,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers han
             case FD_USOCK: return 0;
             default: ERR_GOTO(err, "err: invalid entry-type\n");
         }
-        CHECK(d_epoll_sync_stream(d_ctx->ep_ctx, stream) == -1);
+        CHECK(epoll_reset_stream(d_ctx->ep_ctx, stream) == -1);
     }
     return 0;
 err:

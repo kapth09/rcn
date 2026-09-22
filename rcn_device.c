@@ -169,3 +169,18 @@ err:
     ERR_LOG("e_create_udev");
     return -1;
 }
+
+int e_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
+    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, i) == -1);
+        if (&dev->stream == stream) {
+            CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+            break;
+        }
+    }
+    return 0;
+err:
+    ERR_LOG("e_close_dev");
+    return -1;
+}

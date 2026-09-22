@@ -21,3 +21,11 @@ err:
     ERR_LOG("p_msg_size");
     return SIZE_MAX;
 }
+
+int p_close_peer_ctx(struct peer_context* p_ctx) {
+    CHECK(close(p_ctx->isock_fd) == -1);
+    return 0;
+err:
+    ERR_LOG("p_close_peer_ctx");
+    return -1;
+}

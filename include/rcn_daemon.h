@@ -39,15 +39,15 @@ int d_init_usock(char* sock_path, size_t path_len);
 int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type);
 int d_init_device_ctx(struct device_context* d_ctx);
 int d_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
-int d_broacast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
+int d_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int d_init_epoll_ctx(struct epoll_context* ep_ctx);
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type);
 int d_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream);
 int d_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* device, enum fd_type type);
-int d_epoll_close_remove(struct epoll_context* ep_ctx, struct epoll_stream* stream);
+int d_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream);
 int d_epoll_sync_stream(struct epoll_context* ep_ctx, struct epoll_stream* stream);
 int d_print_log(enum daemon_type d_type);
-ssize_t d_stream_or_close(struct epoll_context* ep_ctx, struct epoll_stream* stream);
+ssize_t d_stream_or_close(struct d_context* d_ctx, struct epoll_stream* stream);
 int d_fork(struct daemon_arg* d_arg, struct relay_arg r_arg);
 int d_loop(struct d_context* d_ctx, struct epoll_handlers handlers);
 

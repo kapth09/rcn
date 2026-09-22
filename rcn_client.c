@@ -122,13 +122,13 @@ static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, s
         case RELAY_HEADER_PAUSE: {
             CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
             epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-            CHECK(d_broacast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
+            CHECK(d_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
             break;
         }
         case RELAY_HEADER_RESUME: {
             CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_RESUME, 0, NULL) == -1);
-            epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-            CHECK(d_broacast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
+            // epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
+            // CHECK(d_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
             break;
         }
         case RELAY_HEADER_STOP: {

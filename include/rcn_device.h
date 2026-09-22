@@ -41,5 +41,6 @@ int e_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
 int e_grab_device_by_ptr(struct device* dev, bool grab);
 int e_get_device_info(int dev_fd, struct device* dev);
 int e_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
+int e_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
 
 #endif //RCN_RCN_DEV_H

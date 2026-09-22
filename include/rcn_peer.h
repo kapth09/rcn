@@ -40,5 +40,6 @@ struct peer_context {
 };
 
 size_t p_msg_size(enum peer_msg_header msg_type);
+int p_close_peer_ctx(struct peer_context* p_ctx);
 
 #endif //RCN_RCN_PEER_H
