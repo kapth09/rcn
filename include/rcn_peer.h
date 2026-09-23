@@ -3,8 +3,9 @@
 
 #include "rcn_device.h"
 
+struct d_context;
+
 enum peer_msg_header {
-    PEER_HEADER_IDLE,
     PEER_HEADER_DEV_CRT,
     PEER_HEADER_DEV_DEL,
     PEER_HEADER_EVENT,
@@ -26,20 +27,12 @@ struct peer_msg_event {
     size_t random_id;
 };
 
-enum peer_conn_state {
-    PERR_CONN_DISCONNECTED,
-    PEER_CONN_PAUSED,
-    PEER_CONN_RESUMED,
-};
-
 struct peer_context {
-    struct epoll_stream* stream;  // pointer to the epoll_entry's stream for easier access
-    enum peer_conn_state peer_state;
-    enum peer_msg_header expected_msg;
-    int isock_fd;
+    struct epoll_stream* isock_stream;
+    struct epoll_stream* peer_stream;
 };
 
-size_t p_msg_size(enum peer_msg_header msg_type);
-int p_close_peer_ctx(struct peer_context* p_ctx);
+int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
+int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type);
 
 #endif //RCN_RCN_PEER_H

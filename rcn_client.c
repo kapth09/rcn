@@ -109,42 +109,6 @@ err:
     return -1;
 }
 
-static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    switch (stream_item->msg.header.value) {
-        case RELAY_HEADER_IDLE: {
-            break;
-        }
-        case RELAY_HEADER_AWAIT: {
-            break;
-        }
-        case RELAY_HEADER_PAUSE: {
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
-            epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-            CHECK(d_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
-            break;
-        }
-        case RELAY_HEADER_RESUME: {
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->stream, PEER_HEADER_RESUME, 0, NULL) == -1);
-            // epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-            // CHECK(d_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
-            break;
-        }
-        case RELAY_HEADER_STOP: {
-            break;
-        }
-        case RELAY_HEADER_ERR: {
-            break;
-        }
-        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->msg.header.value);
-    }
-    return 0;
-err:
-    ERR_LOG("handler_relay");
-    return -1;
-}
-
 int c_start(int port, char *host, char_arr devices_arg) {
     struct epoll_context ep_ctx = {};
     struct relay_context relay_ctx = {};
@@ -154,21 +118,20 @@ int c_start(int port, char *host, char_arr devices_arg) {
     CHECK(d_init_dir() == -1);
 
     CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
-    CHECK(d_init_device_ctx(&device_ctx) == -1);
+    CHECK(e_init_device_ctx(&device_ctx) == -1);
 
-    const int usock_fd = TRY(d_init_usock(RCN_CLIENT_SOCKET_PATH, RCN_CLIENT_SOCKET_LEN), -1);
-    CHECK(d_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
+    const int usock_fd = TRY(r_init_usock(RCN_CLIENT_SOCKET_PATH, RCN_CLIENT_SOCKET_LEN), -1);
+    CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     const int psock_fd = TRY(init_psock(port, host), -1);
-    CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, psock_fd, DAEMON_CLIENT) == -1);
+    CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, psock_fd, DAEMON_CLIENT) == -1);
 
     // CHECK(init_arg_devices(&ep_ctx, peer_ctx.stream, &device_ctx, devices_arg) == -1);
 
     struct daemon_arg d_arg = {
-        .d_type = DAEMON_CLIENT,
         .handlers = {
             .peer_handler = handler_peer,
-            .relay_handler = handler_relay,
+            .relay_handler = handler_peer,
             .device_handler = handler_device,
         },
         .d_ctx = {
@@ -176,6 +139,7 @@ int c_start(int port, char *host, char_arr devices_arg) {
             .peer_ctx = &peer_ctx,
             .relay_ctx = &relay_ctx,
             .device_ctx = &device_ctx,
+            .type = DAEMON_CLIENT,
             .exit = false,
         }
     };

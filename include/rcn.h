@@ -52,6 +52,9 @@
 #define RCN_STD_CAPACITY 10
 #define RCN_DEV_MAX_NAME_LEN 255
 
+#define RCN_PROC_NAME_SERVER "rcn_server"
+#define RCN_PROC_NAME_CLIENT "rcn_client"
+#define RCN_PROC_NAME_RELAY  "rcn_relay"
 
 /* rcn_server.c */
 int s_start(int port);

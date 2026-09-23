@@ -71,6 +71,14 @@ err:
     return -1;
 }
 
+int e_init_device_ctx(struct device_context* d_ctx) {
+    CHECK(u_array_init(&d_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+    return 0;
+err:
+    ERR_LOG("e_init_device_ctx");
+    return -1;
+}
+
 int e_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab) {
     struct device* dev;
     CHECK(find_device(&devices->r, &dev,random_id) == -1);
@@ -171,14 +179,8 @@ err:
 }
 
 int e_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
-    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
-        struct device* dev = {};
-        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, i) == -1);
-        if (&dev->stream == stream) {
-            CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
-            break;
-        }
-    }
+    size_t index = TRY(u_array_find_index(&dev_ctx->devices.r, &stream), -1);
+    CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
     return 0;
 err:
     ERR_LOG("e_close_dev");

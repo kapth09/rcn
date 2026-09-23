@@ -66,8 +66,8 @@ err:
 static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     switch (stream_item->msg.header.value) {
-        case RELAY_HEADER_AWAIT: {
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_AWAIT, 0, NULL) == -1);
+        case RELAY_HEADER_START: {
+            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_START, 0, NULL) == -1);
             break;
         }
         default: ERR_GOTO(err, "err: unknown relay header '%d'", stream_item->msg.header.value);
@@ -87,16 +87,15 @@ int s_start(const int port) {
     CHECK(d_init_dir() == -1);
 
     CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
-    CHECK(d_init_device_ctx(&device_ctx) == -1);
+    CHECK(e_init_device_ctx(&device_ctx) == -1);
 
-    const int usock_fd = TRY(d_init_usock(RCN_SERVER_SOCKET_PATH, RCN_SERVER_SOCKET_LEN), -1);
-    CHECK(d_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
+    const int usock_fd = TRY(r_init_usock(RCN_SERVER_SOCKET_PATH, RCN_SERVER_SOCKET_LEN), -1);
+    CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     const int isock_fd = TRY(init_psock(port), -1);
-    CHECK(d_init_peer_ctx(&ep_ctx, &peer_ctx, isock_fd, DAEMON_SERVER) == -1);
+    CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, isock_fd, DAEMON_SERVER) == -1);
 
     struct daemon_arg d_arg = {
-        .d_type = DAEMON_SERVER,
         .handlers = {
             .peer_handler = handler_peer,
             .relay_handler = handler_relay,
@@ -107,11 +106,12 @@ int s_start(const int port) {
             .peer_ctx = &peer_ctx,
             .relay_ctx = &relay_ctx,
             .device_ctx = &device_ctx,
+            .type = DAEMON_SERVER,
             .exit = false,
         }
     };
     struct relay_arg r_arg = {
-        .header_sent = RELAY_HEADER_AWAIT,
+        .header_sent = RELAY_HEADER_START,
         .d_type = DAEMON_SERVER,
     };
     return d_fork(&d_arg, r_arg);

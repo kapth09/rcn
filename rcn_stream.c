@@ -116,9 +116,9 @@ int stream_stream(struct epoll_stream* stream) {
         streamed = write(stream->fd, buffer_offset, size_remaining);
     else
         ERR_GOTO(err, "err: invalid stream state: %d\n", stream_item->state);
-    // check for errors, ignore EAGAIN and EWOUDLBLOCK
+    // check for errors, ignore EAGAIN/EWOUDLBLOCK and ENODEV if a device is unplugged
     if (streamed == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENODEV) {
             return 0;
         }
         return -1;

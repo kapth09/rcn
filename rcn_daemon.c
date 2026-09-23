@@ -5,14 +5,14 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <linux/prctl.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-#define DEFAULT_USOCK_COUNT 3
 
 ssize_t d_stream_or_close(struct d_context* d_ctx, struct epoll_stream* stream) {
     const int ret = stream_stream(stream);
@@ -26,33 +26,16 @@ err:
     return -1;
 }
 
-static int accept_isock(struct epoll_context* ep_ctx, const struct epoll_stream* stream, int* peer_fd) {
+static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx, const struct epoll_stream* stream) {
     struct sockaddr_in p_iaddr = {};
     struct sockaddr* addr = (struct sockaddr*)&p_iaddr;
     socklen_t addr_len = sizeof(p_iaddr);
     int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
-    CHECK(d_epoll_add(ep_ctx, sock_fd, FD_PEER) == -1);
-    *peer_fd = sock_fd;
+    CHECK(d_epoll_add_getr(ep_ctx, sock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
     return 0;
 err:
     ERR_LOG("accept_isock");
-    return -1;
-}
-
-int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type) {
-    p_ctx->isock_fd = isock_fd;
-    p_ctx->peer_state = PERR_CONN_DISCONNECTED;
-    p_ctx->expected_msg = PEER_HEADER_IDLE;
-    if (d_type == DAEMON_SERVER) {
-        CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_ISOCK, &p_ctx->stream) == -1);
-        CHECK(stream_set_default(p_ctx->stream, STREAM_READING) == -1);
-    } else if (d_type == DAEMON_CLIENT) {
-        CHECK(d_epoll_add_getr(ep_ctx, isock_fd, FD_PEER, &p_ctx->stream) == -1);
-    }
-    return 0;
-err:
-    ERR_LOG("d_init_peer_ctx");
     return -1;
 }
 
@@ -68,36 +51,6 @@ static int accept_usock(struct epoll_context* ep_ctx, epoll_stream_arr* relay_st
     return 0;
 err:
     ERR_LOG("accept_usock");
-    return -1;
-}
-
-int d_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd) {
-    r_ctx->usock_fd = usock_fd;
-    CHECK(u_array_init(&r_ctx->relay_streams.r, sizeof(struct relay*), RCN_STD_CAPACITY) == -1);
-    CHECK(d_epoll_add(ep_ctx, usock_fd, FD_USOCK) == -1);
-    return 0;
-err:
-    ERR_LOG("d_init_relay_ctx");
-    return -1;
-}
-
-int d_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header header) {
-    for (size_t i = 0; i < relay_streams->r.length; i++) {
-        struct epoll_stream* relay_stream = {};
-        CHECK(u_array_getv(&relay_streams->r, &relay_stream, i) == -1);
-        CHECK(stream_queue_writing(ep_ctx, relay_stream, header, 0, NULL) == -1);
-    }
-    return 0;
-err:
-    ERR_LOG("d_broadcast_relay_header");
-    return -1;
-}
-
-int d_init_device_ctx(struct device_context* d_ctx) {
-    CHECK(u_array_init(&d_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
-    return 0;
-err:
-    ERR_LOG("d_init_device_ctx");
     return -1;
 }
 
@@ -239,7 +192,7 @@ int d_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
     switch (stream->fd_type) {
         case FD_RELAY: r_close_relay(d_ctx->relay_ctx, stream); break;
         case FD_DEV: e_close_dev(d_ctx->device_ctx, stream); break;
-        case FD_PEER: p_close_peer_ctx(d_ctx->peer_ctx); break;
+        case FD_PEER: break; // no extra action needed for peer_context
         default: ERR_GOTO(err, "err: unknown fd_type\n");
     }
     struct epoll_context* ep_ctx = d_ctx->ep_ctx;
@@ -265,21 +218,6 @@ err:
     return -1;
 }
 
-int d_init_usock(char* sock_path, size_t path_len) {
-    unlink(sock_path);
-    int d_usock_fd = TRY(socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0), -1);
-    struct sockaddr_un d_uaddr = {
-        .sun_family = AF_UNIX,
-    };
-    memcpy(d_uaddr.sun_path, sock_path, path_len);
-    CHECK(bind(d_usock_fd, (struct sockaddr*)&d_uaddr, sizeof(d_uaddr)) == -1);
-    CHECK(listen(d_usock_fd, DEFAULT_USOCK_COUNT) == -1);
-    return d_usock_fd;
-err:
-    ERR_LOG("d_init_usock");
-    return -1;
-}
-
 static int can_exit(struct d_context* h_ctx) {
     if (h_ctx->exit == false)
         return 0;
@@ -302,7 +240,7 @@ static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buf
                 break;
             }
             case FD_ISOCK: {
-                CHECK(accept_isock(ep_ctx, stream, &d_ctx->peer_ctx->isock_fd) == -1);
+                CHECK(accept_isock(ep_ctx, d_ctx->peer_ctx, stream) == -1);
                 break;
             }
             case FD_PEER: {
@@ -343,11 +281,11 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers han
         }
         switch (stream->fd_type) {
             case FD_PEER: {
-                CHECK(handlers.peer_handler(d_ctx, stream, stream_item) == -1);
+                CHECK(p_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_RELAY: {
-                CHECK(handlers.relay_handler(d_ctx, stream, stream_item) == -1);
+                CHECK(r_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_DEV: {
@@ -379,9 +317,14 @@ err:
     ERR_LOG("d_loop");
     return -1;
 }
-int run(struct daemon_arg* d_arg) {
+static int run(struct daemon_arg* d_arg) {
+    if (d_arg->d_ctx.type == DAEMON_SERVER) {
+        CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_SERVER, 0UL, 0UL, 0UL) == -1);
+    } else {
+        CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_CLIENT, 0UL, 0UL, 0UL) == -1);
+    }
     CHECK(setsid() == -1);
-    CHECK(d_init_log(d_arg->d_type) == -1);
+    CHECK(d_init_log(d_arg->d_ctx.type) == -1);
     CHECK(d_loop(&d_arg->d_ctx, d_arg->handlers) == -1);
     // TODO: REIMPLEMENT
     // CHECK(cleanup(d_arg) == -1);
@@ -396,6 +339,7 @@ int d_fork(struct daemon_arg* d_arg, struct relay_arg r_arg) {
     if (pid == 0) {
         CHECK(run(d_arg) == -1);
     } else {
+        CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
         CHECK(r_trigger(r_arg) == -1);
     }
     return 0;

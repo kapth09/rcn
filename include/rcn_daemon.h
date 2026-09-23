@@ -5,16 +5,13 @@
 #include "rcn_device.h"
 #include "rcn_relay.h"
 
-enum d_msg_source {
-    SRC_RELAY,
-    SRC_PEER,
-};
-
 struct d_context {
     struct epoll_context* ep_ctx;
     struct peer_context* peer_ctx;
     struct device_context* device_ctx;
     struct relay_context* relay_ctx;
+    enum rcn_state state;
+    enum daemon_type type;
     bool exit;
 };
 
@@ -29,17 +26,11 @@ struct epoll_handlers {
 struct daemon_arg {
     struct d_context d_ctx;
     struct epoll_handlers handlers;
-    enum daemon_type d_type;
 };
 
 /* rcn_daemon.c */
 int d_init_dir();
 int d_init_log(enum daemon_type d_type);
-int d_init_usock(char* sock_path, size_t path_len);
-int d_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type);
-int d_init_device_ctx(struct device_context* d_ctx);
-int d_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
-int d_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int d_init_epoll_ctx(struct epoll_context* ep_ctx);
 int d_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type);
 int d_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream);
