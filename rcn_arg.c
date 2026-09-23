@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_PAUSE] =  ARG_SUBACTION_PAUSE,
     [SUBACTION_RESUME] = ARG_SUBACTION_RESUME,
@@ -12,7 +11,6 @@ static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_LOG] = ARG_SUBACTION_LOG,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
-
 
 static const struct arg_help_data help_data[] = {
     {ARG_ACTION_START, ARG_HELP_ACTION_START},
@@ -208,7 +206,6 @@ int arg_help(int argc, char** argv, int* i, struct arg_context* ctx) {
         }
         CHECK(found_action == false);
     }
-
     ctx->help.info.provided = true;
     return 0;
 err:

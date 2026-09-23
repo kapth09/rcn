@@ -15,7 +15,9 @@
 #define MAX_REL_BYTES   ((REL_MAX+7) / 8)
 #define MAX_PROP_BYTES  ((INPUT_PROP_MAX+7) / 8)
 
+/* forward declarations */
 struct d_context;
+struct peer_msg_event;
 
 struct device_info {
     uint8_t evtbit[MAX_EVT_BYTES];
@@ -46,5 +48,6 @@ int dev_get_device_info(int dev_fd, struct device* dev);
 int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
 int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
+int emit_event(device_ptr_arr *devices, struct peer_msg_event event);
 
 #endif //RCN_RCN_DEV_H

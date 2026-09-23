@@ -15,11 +15,18 @@ struct d_context {
     bool exit;
 };
 
+struct daemon_arg {
+    int port;
+    char* host;
+    char_arr devices_arg;
+    enum daemon_type type;
+};
+
 /* rcn_daemon.c */
 int d_init_dir();
 int d_init_log(enum daemon_type d_type);
 int d_print_log(enum daemon_type d_type);
-ssize_t d_stream_or_close(struct d_context* d_ctx, struct epoll_stream* stream);
 int d_fork(struct d_context* d_ctx, struct relay_arg r_arg);
+int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg);
 
 #endif //RCN_RCN_DAEMON_H

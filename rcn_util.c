@@ -1,12 +1,36 @@
 #include "include/rcn.h"
+#include <fcntl.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 /* u_misc */
-
 void u_safe_free(void** ptr) {
     free(*ptr);
     *ptr = NULL;
+}
+
+int u_close_connection(int fd) {
+    int flags = TRY(fcntl(fd, F_GETFL, 0), -1);
+    CHECK(fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1);
+    // wait max. 1 second for the server to send a FIN paket, if not, force close the connection
+    struct timeval tv = {};
+    tv.tv_sec = 1;
+    CHECK(setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) == -1);
+    CHECK(shutdown(fd, SHUT_WR) == -1);
+    uint8_t buffer[64] = { 0 };
+    ssize_t bytes_read;
+    while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {}
+    if (bytes_read == -1 && (errno != EAGAIN && errno != EWOULDBLOCK))
+        goto err;
+    close(fd);
+    return 0;
+err:
+    close(fd);
+    ERR_LOG("c_close_connection");
+    return -1;
 }
 
 /* u_array */
@@ -25,12 +49,11 @@ err:
 }
 
 struct u_array u_array_create(size_t size, size_t capacity) {
-    struct u_array arr = {
-        .length = 0,
-        .capacity = capacity,
-        .size = size,
-        .data = TRY(calloc(capacity, size), NULL)
-    };
+    struct u_array arr = {};
+    arr.length = 0;
+    arr.capacity = capacity;
+    arr.size = size;
+    arr.data = TRY(calloc(capacity, size), NULL);
     return arr;
 err:
     ERR_LOG("u_array_create");

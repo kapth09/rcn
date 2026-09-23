@@ -45,7 +45,9 @@ int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, st
     stream->fd_type= type;
     CHECK(stream_init(stream, fd, type) == -1);
     CHECK(u_array_add(&ep_ctx->stream_ptrs.r, &stream) == -1);
-    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = stream, };
+    struct epoll_event u_evt = {};
+    u_evt.events = EPOLLIN;
+    u_evt.data.ptr = stream;
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
     CHECK(epoll_counter_update(ep_ctx, type, 1) == -1);
     *out_stream = stream;
@@ -68,7 +70,9 @@ int e_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* devi
     struct epoll_stream* stream = TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
     CHECK(stream_init(stream, fd, type) == -1);
     CHECK(u_array_add(&ep_ctx->stream_ptrs.r, &stream) == -1);
-    struct epoll_event u_evt = { .events = EPOLLIN, .data.ptr = stream, };
+    struct epoll_event u_evt = {};
+    u_evt.events = EPOLLIN;
+    u_evt.data.ptr = stream;
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
     CHECK(epoll_counter_update(ep_ctx, type, 1) == -1);
     stream->fd_type= type;
@@ -90,10 +94,9 @@ err:
 
 int e_epoll_sync_stream(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
     enum EPOLL_EVENTS events = stream->next->op == STREAM_WRITING ? EPOLLOUT : EPOLLIN;
-    struct epoll_event evt = {
-        .data.ptr = stream,
-        .events = events,
-    };
+    struct epoll_event evt = {};
+    evt.events = events;
+    evt.data.ptr = stream;
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_MOD, stream->fd, &evt) == -1);
     return 0;
 err:
@@ -121,4 +124,3 @@ err:
     ERR_LOG("d_epoll_close_remove");
     return -1;
 }
-

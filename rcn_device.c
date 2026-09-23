@@ -1,13 +1,12 @@
 #include "include/rcn.h"
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
+#include "include/rcn_epoll.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
 #include <unistd.h>
-
-#include "include/rcn_epoll.h"
 
 static int has_active_key(int dev_fd) {
     if (dev_fd <= 0)
@@ -177,6 +176,22 @@ err:
     if (u_fd != -1)
         close(u_fd);
     ERR_LOG("e_create_udev");
+    return -1;
+}
+
+int emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
+    struct device *dev = NULL;
+    for (size_t i = 0; i < devices->r.length; i++) {
+        CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
+        if (dev->random_id == event.random_id)
+            break;
+    }
+    CHECK(dev == NULL);
+    if (event.evt_data.type == EV_SYN)
+        printf("syn\n");
+    return 0;
+    err:
+        ERR_LOG("emit_event");
     return -1;
 }
 

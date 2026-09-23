@@ -27,6 +27,7 @@ typedef struct {                    \
 
 /* rcn_util.c, u_misc */
 void u_safe_free(void** ptr);
+int u_close_connection(int fd);
 
 /* rcn_util.c, u_array */
 struct u_array u_array_create(size_t size, size_t capacity);

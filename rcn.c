@@ -8,7 +8,7 @@ static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type
         .d_type = d_type,
         .header_sent = TRY(subaction_to_rcn_msg(sa_type), -1),
     };
-    CHECK(r_trigger(r_arg) == -1);
+    CHECK(relay_start(r_arg) == -1);
     return 0;
 err:
     ERR_LOG("subaction_daemon");
@@ -19,10 +19,17 @@ err:
 int action_start(int argc, char** argv) {
     if (argc < 4)
         EARG_COUNT(ARG_ACTION_START, 4, argc);
-    struct arg_context arg_ctx = { 0 };
+    struct arg_context arg_ctx = {};
     arg_ctx.port.info.needed = true;
     CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
-    return s_start(arg_ctx.port.val.v_int);
+    struct daemon_arg d_arg = {};
+    d_arg.type = DAEMON_SERVER;
+    d_arg.port = arg_ctx.port.val.v_int;
+    struct relay_arg r_arg = {};
+    r_arg.header_sent = RELAY_HEADER_START;
+    r_arg.d_type = DAEMON_SERVER;
+    CHECK(daemon_start(d_arg, r_arg) == -1);
+    return 0;
 err:
     ERR_LOG("action_start");
     return -1;
@@ -33,15 +40,21 @@ err:
 int action_connect(int argc, char** argv) {
     if (argc < 8)
         EARG_COUNT(ARG_ACTION_START, 8, argc);
-    struct arg_context arg_ctx = { 0 };
+    struct arg_context arg_ctx = {};
     arg_ctx.devices.info.needed = true;
     arg_ctx.port.info.needed = true;
     arg_ctx.server.info.needed = true;
     CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
-    int port = arg_ctx.port.val.v_int;
-    char* host = arg_ctx.server.val.v_char;
-    char_arr devices = arg_ctx.devices.val.v_char_arr;
-    return c_start(port, host, devices);
+    struct daemon_arg d_arg = {};
+    d_arg.port = arg_ctx.port.val.v_int;
+    d_arg.host = arg_ctx.server.val.v_char;
+    d_arg.devices_arg = arg_ctx.devices.val.v_char_arr;
+    d_arg.type = DAEMON_CLIENT;
+    struct relay_arg r_arg = {};
+    r_arg.header_sent = RELAY_HEADER_START;
+    r_arg.d_type = DAEMON_CLIENT;
+    CHECK(daemon_start(d_arg, r_arg) == -1);
+    return 0;
 err:
     ERR_LOG("action_connect");
     return -1;
@@ -50,7 +63,7 @@ err:
 int action_server(int argc, char** argv) {
     if (argc < 3)
         EARG_COUNT(ARG_ACTION_SERVER, 3, argc);
-    struct arg_context arg_ctx = { 0 };
+    struct arg_context arg_ctx = {};
     arg_ctx.daemon.info.needed = true;
     CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
     if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
@@ -66,7 +79,7 @@ err:
 int action_client(int argc, char** argv) {
     if (argc < 3)
         EARG_COUNT(ARG_ACTION_SERVER, 3, argc);
-    struct arg_context arg_ctx = { 0 };
+    struct arg_context arg_ctx = {};
     arg_ctx.daemon.info.needed = true;
     CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
     if (arg_ctx.daemon.val.saction == SUBACTION_LOG)

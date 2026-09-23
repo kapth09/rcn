@@ -27,15 +27,11 @@ err:
 }
 
 int stream_queue_reading(struct epoll_stream* stream) {
-    struct stream_item stream_data = {
-        .state = STREAM_STREAMING_HEADER,
-        .op = STREAM_READING,
-        .msg = {
-            .header = {},
-            .buffer = NULL,
-        },
-        .buffer_streamed = 0,
-    };
+    struct stream_item stream_data = {};
+    stream_data.state = STREAM_STREAMING_HEADER;
+    stream_data.op = STREAM_READING;
+    stream_data.msg.header = (struct stream_header){};
+    stream_data.buffer_streamed = 0;
     bool was_empty = stream->queue.r.is_empty;
     CHECK(u_queue_push(&stream->queue.r,  &stream_data) == -1);
     if (was_empty)
@@ -47,18 +43,12 @@ err:
 }
 
 int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stream, int header, size_t size, void* data) {
-    struct stream_item stream_data = {
-        .state = STREAM_STREAMING_HEADER,
-        .op = STREAM_WRITING,
-        .msg = {
-            .header = {
-                .value = header,
-                .size = size,
-            },
-            .buffer = TRY(calloc(1, size), NULL),
-        },
-        .buffer_streamed = 0,
-    };
+    struct stream_item stream_data = {};
+    stream_data.state = STREAM_STREAMING_HEADER;
+    stream_data.op = STREAM_WRITING;
+    stream_data.msg.header.value = header;
+    stream_data.msg.header.size = size;
+    stream_data.buffer_streamed = 0;
     memcpy(stream_data.msg.buffer, data, size);
     bool was_empty = stream->queue.r.is_empty;
     CHECK(u_queue_push(&stream->queue.r, &stream_data) == -1);

@@ -2,6 +2,9 @@
 #include "include/rcn_daemon.h"
 #include "include/rcn_epoll.h"
 #include "include/rcn_relay.h"
+
+#include <signal.h>
+
 #include "include/rcn_stream.h"
 #include "include/rcn_types.h"
 #include <arpa/inet.h>
@@ -51,18 +54,23 @@ int r_init_usock(char* sock_path, size_t path_len) {
     CHECK(bind(d_usock_fd, (struct sockaddr*)&d_uaddr, sizeof(d_uaddr)) == -1);
     CHECK(listen(d_usock_fd, DEFAULT_USOCK_COUNT) == -1);
     return d_usock_fd;
-    err:
-        ERR_LOG("d_init_usock");
+err:
+    ERR_LOG("d_init_usock");
     return -1;
 }
 
 static int connect_usock(char* sock_path, size_t path_len) {
     int usock_fd = TRY(socket(AF_UNIX, SOCK_STREAM, 0), -1);
-    struct sockaddr_un r_uaddr = {
-        .sun_family = AF_UNIX,
-    };
+    struct sockaddr_un r_uaddr = {};
+    r_uaddr.sun_family = AF_UNIX;
     memcpy(r_uaddr.sun_path, sock_path, path_len);
     CHECK(connect(usock_fd, (struct sockaddr*)&r_uaddr, sizeof(r_uaddr)) == -1);
+//    for (;;) {
+//        int ret = connect(usock_fd, (struct sockaddr*)&r_uaddr, sizeof(r_uaddr));
+//        if (ret == 0)
+//            break;
+//        CHECK(ret == -1 && (errno != ECONNREFUSED && errno != ENOENT));
+//    }
     return usock_fd;
 err:
     ERR_LOG("r_init_usock");
@@ -76,23 +84,30 @@ int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* rel
         CHECK(stream_queue_writing(ep_ctx, relay_stream, header, 0, NULL) == -1);
     }
     return 0;
-    err:
-        ERR_LOG("d_broadcast_relay_header");
+err:
+    ERR_LOG("d_broadcast_relay_header");
     return -1;
 }
 
-int r_trigger(struct relay_arg arg) {
+void cont_handler(int sig) {
+    (void)sig;
+}
+
+int relay_start(struct relay_arg arg) {
+    signal(SIGCONT, cont_handler);
+    pause();
     CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
-    struct sock_info info = { 0 };
+    struct sock_info info = {};
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
     int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);
     printf("rcn>");
     fflush(stdout);
-    struct stream_header msg = { .value = arg.header_sent, .size = 0};
+    struct stream_header msg = {};
+    msg = (struct stream_header){ .value = arg.header_sent, .size = 0 };
     CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
     // blocking read on .sock to wait for daemon
     CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
-    CHECK(c_close_connection(usock_fd) == -1);
+    CHECK(u_close_connection(usock_fd) == -1);
     printf("\rrcn: %s\n", relay_text[msg.value]);
     return 0;
 err:

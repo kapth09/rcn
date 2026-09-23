@@ -56,11 +56,4 @@
 #define RCN_PROC_NAME_CLIENT "rcn_client"
 #define RCN_PROC_NAME_RELAY  "rcn_relay"
 
-/* rcn_server.c */
-int s_start(int port);
-
-/* rcn_client.c */
-int c_start(int port, char* host, char_arr devices_arg);
-int c_close_connection(int fd);
-
 #endif // !RCN_H
