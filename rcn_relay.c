@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "include/rcn_daemon.h"
+#include "include/rcn_epoll.h"
 #include "include/rcn_stream.h"
 
 struct sock_info {
@@ -191,9 +192,9 @@ err:
 int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd) {
     r_ctx->usock_fd = usock_fd;
     CHECK(u_array_init(&r_ctx->relay_streams.r, sizeof(struct relay*), RCN_STD_CAPACITY) == -1);
-    CHECK(d_epoll_add(ep_ctx, usock_fd, FD_USOCK) == -1);
+    CHECK(e_epoll_add(ep_ctx, usock_fd, FD_USOCK) == -1);
     return 0;
-    err:
-        ERR_LOG("d_init_relay_ctx");
+err:
+    ERR_LOG("d_init_relay_ctx");
     return -1;
 }

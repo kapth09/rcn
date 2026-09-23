@@ -7,6 +7,7 @@
 #include <sys/un.h>
 #include <arpa/inet.h>
 
+#include "include/rcn_epoll.h"
 #include "include/rcn_stream.h"
 
 static int init_psock(const int port) {
@@ -86,8 +87,8 @@ int s_start(const int port) {
 
     CHECK(d_init_dir() == -1);
 
-    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
-    CHECK(e_init_device_ctx(&device_ctx) == -1);
+    CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
+    CHECK(dev_init_device_ctx(&device_ctx) == -1);
 
     const int usock_fd = TRY(r_init_usock(RCN_SERVER_SOCKET_PATH, RCN_SERVER_SOCKET_LEN), -1);
     CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);

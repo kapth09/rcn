@@ -13,6 +13,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "include/rcn_epoll.h"
+
 int c_close_connection(int fd) {
     int flags = TRY(fcntl(fd, F_GETFL, 0), -1);
     CHECK(fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) == -1);
@@ -79,8 +81,8 @@ static int init_arg_devices(struct epoll_context* ep_ctx, struct epoll_stream* p
         char *dev_path = NULL;
         CHECK(u_array_getv(&devices_arg.r, &dev_path, i) == -1);
         struct device dev = {};
-        CHECK(e_init_device(ep_ctx, &device_ctx->devices, dev_path, &dev) == -1);
-        CHECK(e_grab_device_by_ptr(&dev, true) == -1);
+        CHECK(dev_init_device(ep_ctx, &device_ctx->devices, dev_path, &dev) == -1);
+        CHECK(dev_grab_device_by_ptr(&dev, true) == -1);
         CHECK(stream_queue_writing(ep_ctx, peer_stream, PEER_HEADER_DEV_CRT, sizeof(dev), &dev) == -1);
     }
     return 0;
@@ -117,8 +119,8 @@ int c_start(int port, char *host, char_arr devices_arg) {
 
     CHECK(d_init_dir() == -1);
 
-    CHECK(d_init_epoll_ctx(&ep_ctx) == -1);
-    CHECK(e_init_device_ctx(&device_ctx) == -1);
+    CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
+    CHECK(dev_init_device_ctx(&device_ctx) == -1);
 
     const int usock_fd = TRY(r_init_usock(RCN_CLIENT_SOCKET_PATH, RCN_CLIENT_SOCKET_LEN), -1);
     CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);

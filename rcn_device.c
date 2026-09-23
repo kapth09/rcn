@@ -7,6 +7,8 @@
 #include <sys/random.h>
 #include <unistd.h>
 
+#include "include/rcn_epoll.h"
+
 static int has_active_key(int dev_fd) {
     if (dev_fd <= 0)
         DO_GOTO(fprintf(stderr, "err: dev_fd is <= 0\n"), err);
@@ -59,10 +61,10 @@ err:
     return -1;
 }
 
-int e_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev) {
+int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev) {
     int dev_fd = TRY(open(dev_path, O_RDONLY | O_NONBLOCK), -1);
-    CHECK(e_get_device_info(dev_fd, out_dev) == -1);
-    CHECK(d_epoll_add_device(ep_ctx, dev_fd, out_dev, FD_DEV) == -1);
+    CHECK(dev_get_device_info(dev_fd, out_dev) == -1);
+    CHECK(e_epoll_add_device(ep_ctx, dev_fd, out_dev, FD_DEV) == -1);
     CHECK(u_array_add(&devices->r, out_dev) == -1);
     return 0;
 err:
@@ -71,7 +73,7 @@ err:
     return -1;
 }
 
-int e_init_device_ctx(struct device_context* d_ctx) {
+int dev_init_device_ctx(struct device_context* d_ctx) {
     CHECK(u_array_init(&d_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
     return 0;
 err:
@@ -79,7 +81,7 @@ err:
     return -1;
 }
 
-int e_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab) {
+int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab) {
     struct device* dev;
     CHECK(find_device(&devices->r, &dev,random_id) == -1);
     CHECK(drain_events(dev) == -1);
@@ -90,7 +92,7 @@ err:
     return -1;
 }
 
-int e_grab_device_by_ptr(struct device* dev, bool grab) {
+int dev_grab_device_by_ptr(struct device* dev, bool grab) {
     CHECK(drain_events(dev) == -1);
     // CHECK(ioctl(dev->entry->fd, EVIOCGRAB, &grab) == -1);
     return 0;
@@ -99,7 +101,7 @@ err:
     return -1;
 }
 
-int e_get_device_info(int dev_fd, struct device* device) {
+int dev_get_device_info(int dev_fd, struct device* device) {
     memset(device, 0, sizeof(struct device));
     device->stream.fd = dev_fd;
     struct device_info* info = &device->info;
@@ -135,7 +137,7 @@ err:
     return -1;
 }
 
-int e_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev) {
+int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev) {
     int u_fd = -1;
     u_fd = TRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK), -1);
     struct device_info* info = &new_dev->info;
@@ -169,7 +171,7 @@ int e_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct 
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
     CHECK(u_array_add(&devices->r, new_dev) == -1);
-    CHECK(d_epoll_add(ep_ctx, u_fd, FD_DEV) == -1);
+    CHECK(e_epoll_add(ep_ctx, u_fd, FD_DEV) == -1);
     return 0;
 err:
     if (u_fd != -1)
@@ -178,7 +180,7 @@ err:
     return -1;
 }
 
-int e_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
+int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
     size_t index = TRY(u_array_find_index(&dev_ctx->devices.r, &stream), -1);
     CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
     return 0;

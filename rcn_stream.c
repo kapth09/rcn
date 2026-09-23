@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "include/rcn_daemon.h"
+#include "include/rcn_epoll.h"
 
 int stream_init(struct epoll_stream* stream, int fd, enum fd_type type) {
     stream->fd = fd;
@@ -63,7 +64,7 @@ int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stre
     CHECK(u_queue_push(&stream->queue.r, &stream_data) == -1);
     if (was_empty)
         CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
-    CHECK(d_epoll_sync_stream(ep_ctx, stream) == -1);
+    CHECK(e_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
     ERR_LOG("stream_set_writing");

@@ -36,12 +36,12 @@ struct device_context {
     device_ptr_arr devices;
 };
 
-int e_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev);
-int e_init_device_ctx(struct device_context* d_ctx);
-int e_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
-int e_grab_device_by_ptr(struct device* dev, bool grab);
-int e_get_device_info(int dev_fd, struct device* dev);
-int e_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
-int e_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
+int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev);
+int dev_init_device_ctx(struct device_context* d_ctx);
+int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
+int dev_grab_device_by_ptr(struct device* dev, bool grab);
+int dev_get_device_info(int dev_fd, struct device* dev);
+int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
+int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
 
 #endif //RCN_RCN_DEV_H
