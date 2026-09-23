@@ -41,7 +41,6 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
-    printf("peer pause");
     if (d_ctx->type == DAEMON_CLIENT) {}
     // TODO: ungrab devices
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
@@ -56,7 +55,6 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
-    printf("peer pause");
     if (d_ctx->type == DAEMON_CLIENT) {}
     // TODO: regrab devices
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;

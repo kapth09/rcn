@@ -91,26 +91,6 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    return 0;
-err:
-    ERR_LOG("handler_device");
-    return -1;
-}
-
-static int handler_peer(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    return 0;
-err:
-    ERR_LOG("handler_peer");
-    return -1;
-}
-
 int c_start(int port, char *host, char_arr devices_arg) {
     struct epoll_context ep_ctx = {};
     struct relay_context relay_ctx = {};
@@ -130,27 +110,20 @@ int c_start(int port, char *host, char_arr devices_arg) {
 
     // CHECK(init_arg_devices(&ep_ctx, peer_ctx.stream, &device_ctx, devices_arg) == -1);
 
-    struct daemon_arg d_arg = {
-        .handlers = {
-            .peer_handler = handler_peer,
-            .relay_handler = handler_peer,
-            .device_handler = handler_device,
-        },
-        .d_ctx = {
+    struct d_context d_ctx = {
             .ep_ctx = &ep_ctx,
             .peer_ctx = &peer_ctx,
             .relay_ctx = &relay_ctx,
             .device_ctx = &device_ctx,
             .type = DAEMON_CLIENT,
             .exit = false,
-        }
     };
     struct relay_arg r_arg = {
         .header_sent = RELAY_HEADER_IDLE,
         .d_type =  DAEMON_CLIENT,
     };
     CHECK(u_array_free(&devices_arg.r) == -1);
-    return d_fork(&d_arg, r_arg);
+    return d_fork(&d_ctx, r_arg);
 err:
     if (ep_ctx.stream_ptrs.r.data != NULL)
         u_array_free(&ep_ctx.stream_ptrs.r);

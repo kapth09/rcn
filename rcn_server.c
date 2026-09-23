@@ -1,14 +1,12 @@
 #include "include/rcn.h"
-#include "include/rcn_peer.h"
-#include "include/rcn_device.h"
 #include "include/rcn_daemon.h"
-#include <unistd.h>
+#include "include/rcn_device.h"
+#include "include/rcn_epoll.h"
+#include "include/rcn_peer.h"
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <arpa/inet.h>
-
-#include "include/rcn_epoll.h"
-#include "include/rcn_stream.h"
+#include <unistd.h>
 
 static int init_psock(const int port) {
     const int isock_fd = TRY(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), -1);
@@ -44,41 +42,6 @@ err:
     return -1;
 }
 
-static int handler_device(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    return 0;
-err:
-    ERR_LOG("handler_device");
-    return -1;
-}
-
-static int handler_peer(struct d_context *d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    return 0;
-err:
-    ERR_LOG("handler_peer");
-    return -1;
-}
-
-static int handler_relay(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    switch (stream_item->msg.header.value) {
-        case RELAY_HEADER_START: {
-            CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_START, 0, NULL) == -1);
-            break;
-        }
-        default: ERR_GOTO(err, "err: unknown relay header '%d'", stream_item->msg.header.value);
-    }
-    return 0;
-err:
-    ERR_LOG("handler_relay");
-    return -1;
-}
-
 int s_start(const int port) {
     struct peer_context peer_ctx = {};
     struct device_context device_ctx = {};
@@ -96,26 +59,19 @@ int s_start(const int port) {
     const int isock_fd = TRY(init_psock(port), -1);
     CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, isock_fd, DAEMON_SERVER) == -1);
 
-    struct daemon_arg d_arg = {
-        .handlers = {
-            .peer_handler = handler_peer,
-            .relay_handler = handler_relay,
-            .device_handler = handler_device,
-        },
-        .d_ctx = {
+    struct d_context d_ctx = {
             .ep_ctx = &ep_ctx,
             .peer_ctx = &peer_ctx,
             .relay_ctx = &relay_ctx,
             .device_ctx = &device_ctx,
             .type = DAEMON_SERVER,
             .exit = false,
-        }
     };
     struct relay_arg r_arg = {
         .header_sent = RELAY_HEADER_START,
         .d_type = DAEMON_SERVER,
     };
-    return d_fork(&d_arg, r_arg);
+    return d_fork(&d_ctx, r_arg);
 err:
     if (ep_ctx.stream_ptrs.r.data != NULL)
         u_array_free(&ep_ctx.stream_ptrs.r);

@@ -1,14 +1,14 @@
 #include "include/rcn.h"
+#include "include/rcn_daemon.h"
+#include "include/rcn_epoll.h"
 #include "include/rcn_relay.h"
+#include "include/rcn_stream.h"
 #include "include/rcn_types.h"
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <sys/prctl.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-#include "include/rcn_daemon.h"
-#include "include/rcn_epoll.h"
-#include "include/rcn_stream.h"
 
 struct sock_info {
     char* sock_path;
@@ -82,6 +82,7 @@ int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* rel
 }
 
 int r_trigger(struct relay_arg arg) {
+    CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
     struct sock_info info = { 0 };
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
     int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);

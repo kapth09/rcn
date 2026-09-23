@@ -188,3 +188,10 @@ err:
     ERR_LOG("e_close_dev");
     return -1;
 }
+
+int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)d_ctx;
+    (void)stream;
+    (void)stream_item;
+    return 0;
+}

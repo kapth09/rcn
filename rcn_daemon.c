@@ -151,7 +151,7 @@ err:
     return -1;
 }
 
-static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers handlers, struct epoll_event* epoll_buff, int fd_count) {
+static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll_buff, int fd_count) {
     for (int i = 0; i < fd_count; i++) {
         struct epoll_event evt = epoll_buff[i];
         struct epoll_stream* stream = evt.data.ptr;
@@ -174,7 +174,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_handlers han
                 break;
             }
             case FD_DEV: {
-                CHECK(handlers.device_handler(d_ctx, stream, stream_item) == -1);
+                CHECK(dev_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_ISOCK: return 0;
@@ -189,28 +189,29 @@ err:
     return -1;
 }
 
-int d_loop(struct d_context* d_ctx, struct epoll_handlers handlers) {
+static int d_loop(struct d_context* d_ctx) {
     struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     while (can_exit(d_ctx) == false) {
         const size_t fd_count = ep_ctx->stream_ptrs.r.length;
         struct epoll_event epoll_buff[fd_count];
         const int nfds = TRY(dispatch_epoll(d_ctx, epoll_buff, fd_count), -1);
-        CHECK(resolve_fd_streams(d_ctx, handlers, epoll_buff, nfds) == -1);
+        CHECK(resolve_fd_streams(d_ctx, epoll_buff, nfds) == -1);
     }
     return 0;
 err:
     ERR_LOG("d_loop");
     return -1;
 }
-static int run(struct daemon_arg* d_arg) {
-    if (d_arg->d_ctx.type == DAEMON_SERVER) {
+
+static int run(struct d_context* d_ctx) {
+    if (d_ctx->type == DAEMON_SERVER) {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_SERVER, 0UL, 0UL, 0UL) == -1);
     } else {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_CLIENT, 0UL, 0UL, 0UL) == -1);
     }
     CHECK(setsid() == -1);
-    CHECK(d_init_log(d_arg->d_ctx.type) == -1);
-    CHECK(d_loop(&d_arg->d_ctx, d_arg->handlers) == -1);
+    CHECK(d_init_log(d_ctx->type) == -1);
+    CHECK(d_loop(d_ctx) == -1);
     // TODO: REIMPLEMENT
     // CHECK(cleanup(d_arg) == -1);
     return 0;
@@ -219,12 +220,11 @@ err:
     return -1;
 }
 
-int d_fork(struct daemon_arg* d_arg, struct relay_arg r_arg) {
+int d_fork(struct d_context* d_ctx, struct relay_arg r_arg) {
     const pid_t pid = TRY(fork(), -1);
     if (pid == 0) {
-        CHECK(run(d_arg) == -1);
+        CHECK(run(d_ctx) == -1);
     } else {
-        CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
         CHECK(r_trigger(r_arg) == -1);
     }
     return 0;
