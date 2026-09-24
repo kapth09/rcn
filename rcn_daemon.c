@@ -1,13 +1,13 @@
 #include "include/rcn.h"
-#include "include/rcn_daemon.h"
 #include "include/rcn_epoll.h"
 #include "include/rcn_stream.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <netdb.h>
-#include <signal.h>
 #include <linux/prctl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/prctl.h>
@@ -15,7 +15,6 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <netinet/tcp.h>
 
 static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx, const struct epoll_stream* stream) {
     struct sockaddr_in p_iaddr = {};
@@ -64,7 +63,7 @@ err:
 }
 
 int d_init_dir() {
-    const int rcn_dir = mkdir(RCN_DAEMON_DIR_PATH, 0);
+    const int rcn_dir = mkdir(RCN_DAEMON_DIR_PATH, 0755);
     CHECK(rcn_dir == -1 && errno != EEXIST);
     return 0;
 err:
@@ -99,8 +98,8 @@ static int resolve_host(const int port, const char *host, struct addrinfo** addr
     if (res != 0)
         goto err;
     return 0;
-    err:
-        ERR_LOG("%s", gai_strerror(res));
+err:
+    ERR_LOG("%s", gai_strerror(res));
     return -1;
 }
 
@@ -125,8 +124,8 @@ static int init_peer_sock(const int port, const char *host) {
     int fd_flags = TRY(fcntl(isock_fd, F_GETFL, 0), 1);
     CHECK(fcntl(isock_fd, F_SETFL, O_NONBLOCK | fd_flags) == -1);
     return isock_fd;
-    err:
-        ERR_LOG("client init_psock");
+err:
+    ERR_LOG("client init_psock");
     return -1;
 }
 
@@ -141,8 +140,8 @@ static int init_inet_sock(const int port) {
     CHECK(bind(isock_fd, (struct sockaddr*)&s_iaddr, sizeof(s_iaddr)) == -1);
     CHECK(listen(isock_fd, 0) == -1);
     return isock_fd;
-    err:
-        ERR_LOG("server init_psock");
+err:
+    ERR_LOG("server init_psock");
     return -1;
 }
 
@@ -251,19 +250,19 @@ err:
 }
 
 static int d_init(struct daemon_arg arg) {
+    pid_t relay_pid = getppid();
     if (arg.type == DAEMON_SERVER) {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_SERVER, 0UL, 0UL, 0UL) == -1);
     } else {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_CLIENT, 0UL, 0UL, 0UL) == -1);
     }
+    CHECK(d_init_dir() == -1);
     CHECK(d_init_log(arg.type) == -1);
 
     struct epoll_context ep_ctx = {};
     struct relay_context relay_ctx = {};
     struct peer_context peer_ctx = {};
     struct device_context device_ctx = {};
-
-    CHECK(d_init_dir() == -1);
 
     CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
     CHECK(dev_init_device_ctx(&device_ctx) == -1);
@@ -278,8 +277,6 @@ static int d_init(struct daemon_arg arg) {
         sock_len = RCN_CLIENT_SOCKET_LEN;
     }
     const int usock_fd = TRY(r_init_usock(sock_path, sock_len), -1);
-    pid_t relay_pid = getppid();
-    CHECK(kill(relay_pid, SIGCONT) == -1);
     CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     int net_fd = 0;
@@ -291,7 +288,7 @@ static int d_init(struct daemon_arg arg) {
 
     if (arg.type == DAEMON_CLIENT) {
         // init_arg_devices
-        CHECK(u_array_free(&arg.devices_arg.r) == -1);
+        CHECK(u_array_free(&arg.devices_arg->r) == -1);
     }
 
     struct d_context d_ctx = {};
@@ -301,9 +298,11 @@ static int d_init(struct daemon_arg arg) {
     d_ctx.device_ctx = &device_ctx;
     d_ctx.type = arg.type;
 
+    CHECK(kill(relay_pid, SIGCONT) == -1);
     CHECK(d_loop(&d_ctx) == -1);
     return 0;
 err:
+    CHECK(kill(relay_pid, SIGCONT) == -1);
     ERR_LOG("d_init");
     return -1;
 }

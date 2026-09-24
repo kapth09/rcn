@@ -11,5 +11,6 @@ int stream_set_default(struct epoll_stream* stream, enum stream_operation defaul
 int stream_clear_fallback(struct epoll_stream* stream);
 int stream_collect(struct epoll_stream* stream, struct stream_item** stream_data);
 int stream_close(struct epoll_stream* stream);
+int stream_shutdown(struct epoll_stream* stream);
 
 #endif //RCN_RCN_STREAM_H

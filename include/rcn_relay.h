@@ -22,6 +22,7 @@ struct relay_msg {
 struct relay_arg {
     enum relay_msg_header header_sent;
     enum daemon_type d_type;
+    bool sleep;
 };
 
 struct relay_context {

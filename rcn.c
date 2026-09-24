@@ -4,10 +4,10 @@
 #include <string.h>
 
 static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type) {
-    struct relay_arg r_arg = {
-        .d_type = d_type,
-        .header_sent = TRY(subaction_to_rcn_msg(sa_type), -1),
-    };
+    struct relay_arg r_arg = {};
+    r_arg.d_type = d_type;
+    r_arg.header_sent = TRY(subaction_to_rcn_msg(sa_type), -1);
+    r_arg.sleep = false;
     CHECK(relay_start(r_arg) == -1);
     return 0;
 err:
@@ -28,6 +28,7 @@ int action_start(int argc, char** argv) {
     struct relay_arg r_arg = {};
     r_arg.header_sent = RELAY_HEADER_START;
     r_arg.d_type = DAEMON_SERVER;
+    r_arg.sleep = true;
     CHECK(daemon_start(d_arg, r_arg) == -1);
     return 0;
 err:
@@ -48,12 +49,15 @@ int action_connect(int argc, char** argv) {
     struct daemon_arg d_arg = {};
     d_arg.port = arg_ctx.port.val.v_int;
     d_arg.host = arg_ctx.server.val.v_char;
-    d_arg.devices_arg = arg_ctx.devices.val.v_char_arr;
+    d_arg.devices_arg = &arg_ctx.devices.val.v_char_arr;
     d_arg.type = DAEMON_CLIENT;
     struct relay_arg r_arg = {};
-    r_arg.header_sent = RELAY_HEADER_START;
+    r_arg.header_sent = RELAY_HEADER_IDLE;
     r_arg.d_type = DAEMON_CLIENT;
+    r_arg.sleep = true;
     CHECK(daemon_start(d_arg, r_arg) == -1);
+    if (d_arg.devices_arg != NULL)
+        CHECK(u_array_free(&d_arg.devices_arg->r) == -1);
     return 0;
 err:
     ERR_LOG("action_connect");

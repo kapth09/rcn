@@ -55,7 +55,7 @@ int r_init_usock(char* sock_path, size_t path_len) {
     CHECK(listen(d_usock_fd, DEFAULT_USOCK_COUNT) == -1);
     return d_usock_fd;
 err:
-    ERR_LOG("d_init_usock");
+    ERR_LOG("r_init_usock");
     return -1;
 }
 
@@ -65,12 +65,6 @@ static int connect_usock(char* sock_path, size_t path_len) {
     r_uaddr.sun_family = AF_UNIX;
     memcpy(r_uaddr.sun_path, sock_path, path_len);
     CHECK(connect(usock_fd, (struct sockaddr*)&r_uaddr, sizeof(r_uaddr)) == -1);
-//    for (;;) {
-//        int ret = connect(usock_fd, (struct sockaddr*)&r_uaddr, sizeof(r_uaddr));
-//        if (ret == 0)
-//            break;
-//        CHECK(ret == -1 && (errno != ECONNREFUSED && errno != ENOENT));
-//    }
     return usock_fd;
 err:
     ERR_LOG("r_init_usock");
@@ -93,9 +87,21 @@ void cont_handler(int sig) {
     (void)sig;
 }
 
-int relay_start(struct relay_arg arg) {
+static int sleep_usock() {
+    printf("...\r");
+    fflush(stdout);
     signal(SIGCONT, cont_handler);
-    pause();
+    const unsigned int remaining = sleep(3);
+    CHECK(remaining == 0);
+    return 0;
+err:
+    ERR_LOG("sleep_usock: relay timeout, no response from server\n");
+    return -1;
+}
+
+int relay_start(struct relay_arg arg) {
+    if (arg.sleep == true)
+        CHECK(sleep_usock() == -1);
     CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
     struct sock_info info = {};
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
@@ -135,7 +141,6 @@ err:
 
 static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
-    printf("pausing");
     if (d_ctx->state == RCN_PAUSED) {
         CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_PAUSE_AGAIN, 0, NULL) == -1);
         return 0;
@@ -172,7 +177,16 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
+    d_ctx->exit = true;
+    epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
+    CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
+    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
+    if (d_ctx->type == DAEMON_CLIENT)
+        CHECK(stream_shutdown(d_ctx->peer_ctx->peer_stream) == -1);
     return 0;
+err:
+    ERR_LOG("handler_stop");
+    return -1;
 }
 
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {

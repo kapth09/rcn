@@ -166,3 +166,12 @@ err:
     ERR_LOG("stream_close");
     return -1;
 }
+
+int stream_shutdown(struct epoll_stream* stream) {
+    CHECK(u_close_connection(stream->fd) == -1);
+    CHECK(stream_close(stream) == -1);
+    return 0;
+err:
+    ERR_LOG("stream_shutdown");
+    return -1;
+}

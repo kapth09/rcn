@@ -143,8 +143,7 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->devices.info.provided == true)
         EARG_AGAIN(ARG_FLAG_DEVICES);
     char_arr* dev_arr = &ctx->devices.val.v_char_arr;
-    dev_arr->r = u_array_create(sizeof(char*), RCN_STD_CAPACITY);
-    CHECK(dev_arr->r.data == NULL);
+    CHECK(u_array_init(&dev_arr->r, sizeof(char*), RCN_STD_CAPACITY) == -1);
     (*i)++;
     for (; *i < argc; (*i)++) {
         char* arg = argv[*i];

@@ -30,7 +30,6 @@ void u_safe_free(void** ptr);
 int u_close_connection(int fd);
 
 /* rcn_util.c, u_array */
-struct u_array u_array_create(size_t size, size_t capacity);
 int u_array_init(struct u_array* arr, size_t size, size_t capacity);
 int u_array_resize(struct u_array* arr, size_t extra_elements);
 int u_array_add(struct u_array* arr, void* data);

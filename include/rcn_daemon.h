@@ -18,7 +18,7 @@ struct d_context {
 struct daemon_arg {
     int port;
     char* host;
-    char_arr devices_arg;
+    char_arr* devices_arg;
     enum daemon_type type;
 };
 
