@@ -95,6 +95,7 @@ int e_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
     switch (stream->fd_type) {
         case FD_RELAY: r_close_relay(d_ctx->relay_ctx, stream); break;
         case FD_DEV: dev_close_dev(d_ctx->device_ctx, stream); break;
+        case FD_ISOCK: p_close_peer(d_ctx->ep_ctx, d_ctx->peer_ctx); break;
         case FD_PEER: p_close_peer(d_ctx->ep_ctx, d_ctx->peer_ctx); break;
         default: ERR_GOTO(err, "err: unknown fd_type\n");
     }

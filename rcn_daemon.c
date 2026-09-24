@@ -27,9 +27,7 @@ static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx
     }
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     CHECK(e_epoll_add_getr(ep_ctx, sock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL) == -1);
     p_ctx->peer_state = PEER_CONNECTED;
-    printf("accepted isock\n");
     return 0;
 err:
     ERR_LOG("accept_isock");
@@ -320,7 +318,7 @@ static int d_init(struct daemon_arg arg) {
     CHECK(cleanup(&d_ctx) == -1);
     return 0;
 err:
-    CHECK(kill(relay_pid, SIGTSTP) == -1);
+    kill(relay_pid, SIGTSTP);
     ERR_LOG("d_init");
     return -1;
 }

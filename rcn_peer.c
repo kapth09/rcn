@@ -69,8 +69,15 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
+    if (d_ctx->type == DAEMON_SERVER) {
+        // TODO: delete all udev
+    } else if (d_ctx->type == DAEMON_CLIENT) {
+        d_ctx->exit = true;
+        epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
+        CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
+    }
     return 0;
-//err:
+err:
     ERR_LOG("handler_stop");
     return -1;
 }
@@ -128,10 +135,14 @@ err:
 }
 
 int p_close_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
-    if (p_ctx->isock_stream != NULL)
+    if (p_ctx->isock_stream != NULL && p_ctx->isock_state != PEER_DISCONNECTED) {
+        p_ctx->isock_state = PEER_DISCONNECTED;
         CHECK(e_epoll_close_remove_simple(ep_ctx, p_ctx->isock_stream) == -1);
-    if (p_ctx->peer_stream != NULL)
+    }
+    if (p_ctx->peer_stream != NULL && p_ctx->peer_state != PEER_DISCONNECTED) {
+        p_ctx->peer_state = PEER_DISCONNECTED;
         CHECK(e_epoll_close_remove_simple(ep_ctx, p_ctx->peer_stream) == -1);
+    }
     return 0;
 err:
     ERR_LOG("p_close_peer_ctx");

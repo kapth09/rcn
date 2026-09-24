@@ -162,6 +162,7 @@ int stream_close(struct epoll_stream* stream) {
     if (stream->fallback.msg.buffer != NULL)
         u_safe_free(&stream->fallback.msg.buffer);
     close(stream->fd);
+    stream->fd = -1;
     return 0;
 err:
     ERR_LOG("stream_close");

@@ -35,6 +35,7 @@ enum peer_state {
 struct peer_context {
     struct epoll_stream* isock_stream;
     struct epoll_stream* peer_stream;
+    enum peer_state isock_state;
     enum peer_state peer_state;
 };
 
