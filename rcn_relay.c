@@ -9,6 +9,7 @@
 #include "include/rcn_types.h"
 #include <arpa/inet.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/prctl.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -83,18 +84,26 @@ err:
     return -1;
 }
 
+void tstp_handler(int sig) {
+    (void)sig;
+    fprintf(stderr, "\rerr: cannot start daemon, see log for more info\n");
+    exit(-1);
+}
+
 void cont_handler(int sig) {
     (void)sig;
 }
 
 static int sleep_usock() {
-    printf("...\r");
+    printf("...");
     fflush(stdout);
     signal(SIGCONT, cont_handler);
-    const unsigned int remaining = sleep(3);
+    signal(SIGTSTP, tstp_handler);
+    const unsigned int remaining = sleep(RELAY_SLEEP_TIMEOUT);
     CHECK(remaining == 0);
     return 0;
 err:
+    fprintf(stderr, "\r");
     ERR_LOG("sleep_usock: relay timeout, no response from server\n");
     return -1;
 }
@@ -106,17 +115,18 @@ int relay_start(struct relay_arg arg) {
     struct sock_info info = {};
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
     int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);
-    printf("rcn>");
+    printf("\rrcn>");
     fflush(stdout);
     struct stream_header msg = {};
     msg = (struct stream_header){ .value = arg.header_sent, .size = 0 };
     CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
-    // blocking read on .sock to wait for daemon
+    // blocking read on socket to wait for daemon
     CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
     CHECK(u_close_connection(usock_fd) == -1);
     printf("\rrcn: %s\n", relay_text[msg.value]);
     return 0;
 err:
+    fprintf(stderr, "\r");
     ERR_LOG("r_await");
     return -1;
 }
@@ -181,8 +191,6 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
     CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
-    if (d_ctx->type == DAEMON_CLIENT)
-        CHECK(stream_shutdown(d_ctx->peer_ctx->peer_stream) == -1);
     return 0;
 err:
     ERR_LOG("handler_stop");
@@ -226,5 +234,19 @@ int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, 
     return 0;
 err:
     ERR_LOG("d_init_relay_ctx");
+    return -1;
+}
+
+int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx) {
+    // do not close usock_fd, its closed in close_epoll_ctx
+    for (size_t i = 0; i < r_ctx->relay_streams.r.length; i++) {
+        struct epoll_stream* r_stream = {};
+        CHECK(u_array_getr(&r_ctx->relay_streams.r, (void**)&r_stream, i) == -1);
+        CHECK(e_epoll_close_remove_simple(ep_ctx, r_stream) == -1);
+    }
+    CHECK(u_array_free(&r_ctx->relay_streams.r) == -1);
+    return 0;
+err:
+    ERR_LOG("r_close_relay_ctx");
     return -1;
 }

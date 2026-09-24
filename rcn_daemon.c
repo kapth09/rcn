@@ -21,8 +21,15 @@ static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx
     struct sockaddr* addr = (struct sockaddr*)&p_iaddr;
     socklen_t addr_len = sizeof(p_iaddr);
     int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
+    if (p_ctx->peer_state == PEER_CONNECTED) {
+        close(sock_fd);
+        return 0;
+    }
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     CHECK(e_epoll_add_getr(ep_ctx, sock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL) == -1);
+    p_ctx->peer_state = PEER_CONNECTED;
+    printf("accepted isock\n");
     return 0;
 err:
     ERR_LOG("accept_isock");
@@ -145,12 +152,10 @@ err:
     return -1;
 }
 
-static int can_exit(struct d_context* h_ctx) {
-    if (h_ctx->exit == false)
+static int can_exit(struct d_context* d_ctx) {
+    if (d_ctx->exit == false)
         return 0;
-    if (h_ctx->ep_ctx->peer_count > 0)
-        return 0;
-    if (h_ctx->ep_ctx->relay_count > 0)
+    if (d_ctx->relay_ctx->relay_streams.r.length > 0)
         return 0;
     return 1;
 }
@@ -235,6 +240,18 @@ err:
     return -1;
 }
 
+static int cleanup(struct d_context* d_ctx) {
+    struct epoll_context* ep_ctx = d_ctx->ep_ctx;
+    CHECK(r_close_relay_ctx(ep_ctx, d_ctx->relay_ctx) == -1);
+    CHECK(p_close_peer_ctx(ep_ctx, d_ctx->peer_ctx) == -1);
+    CHECK(dev_close_device_ctx(ep_ctx, d_ctx->device_ctx) == -1);
+    CHECK(e_close_epoll_ctx(ep_ctx) == -1); // close epoll_ctx last, as other ctx depend on its FD
+    return 0;
+err:
+    ERR_LOG("cleanup");
+    return -1;
+}
+
 static int d_loop(struct d_context* d_ctx) {
     struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     while (can_exit(d_ctx) == false) {
@@ -300,9 +317,10 @@ static int d_init(struct daemon_arg arg) {
 
     CHECK(kill(relay_pid, SIGCONT) == -1);
     CHECK(d_loop(&d_ctx) == -1);
+    CHECK(cleanup(&d_ctx) == -1);
     return 0;
 err:
-    CHECK(kill(relay_pid, SIGCONT) == -1);
+    CHECK(kill(relay_pid, SIGTSTP) == -1);
     ERR_LOG("d_init");
     return -1;
 }

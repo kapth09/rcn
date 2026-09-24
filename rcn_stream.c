@@ -1,12 +1,9 @@
 #include "include/rcn.h"
-#include "include/rcn_peer.h"
+#include "include/rcn_epoll.h"
 #include "include/rcn_stream.h"
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "include/rcn_daemon.h"
-#include "include/rcn_epoll.h"
 
 int stream_init(struct epoll_stream* stream, int fd, enum fd_type type) {
     stream->fd = fd;
@@ -109,7 +106,11 @@ int stream_stream(struct epoll_stream* stream) {
         ERR_GOTO(err, "err: invalid stream state: %d\n", stream_item->state);
     // check for errors, ignore EAGAIN/EWOUDLBLOCK and ENODEV if a device is unplugged
     if (streamed == -1) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENODEV) {
+        if (errno == ENODEV) {
+            stream_item->state = STREAM_CLOSED;
+            return 0;
+        }
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
             return 0;
         }
         return -1;
@@ -152,10 +153,10 @@ err:
 
 int stream_close(struct epoll_stream* stream) {
     while (stream->queue.r.is_empty == false) {
-        struct stream_item* stream_item = NULL;
-        CHECK(u_queue_pop(&stream->queue.r, stream_item) == -1);
-        if (stream_item->msg.buffer != NULL)
-            u_safe_free(&stream_item->msg.buffer);
+        struct stream_item stream_item = {};
+        CHECK(u_queue_pop(&stream->queue.r, &stream_item) == -1);
+        if (stream_item.msg.buffer != NULL)
+            u_safe_free(&stream_item.msg.buffer);
     }
     CHECK(u_queue_free(&stream->queue.r) == -1);
     if (stream->fallback.msg.buffer != NULL)

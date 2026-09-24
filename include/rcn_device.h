@@ -41,7 +41,8 @@ struct device_context {
 };
 
 int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev);
-int dev_init_device_ctx(struct device_context* d_ctx);
+int dev_init_device_ctx(struct device_context* dev_ctx);
+int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
 int dev_grab_device_by_ptr(struct device* dev, bool grab);
 int dev_get_device_info(int dev_fd, struct device* dev);

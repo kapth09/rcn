@@ -2,6 +2,7 @@
 #define RCN_RCN_RELAY_H
 
 #define DEFAULT_USOCK_COUNT 3
+#define RELAY_SLEEP_TIMEOUT 5
 
 struct d_context;
 
@@ -37,7 +38,8 @@ int r_init_usock(char* sock_path, size_t path_len);
 int relay_start(struct relay_arg arg);
 int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream);
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
-int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
 int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
+int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
+int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx);
 
 #endif //RCN_RCN_RELAY_H

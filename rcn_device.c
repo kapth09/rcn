@@ -72,11 +72,25 @@ err:
     return -1;
 }
 
-int dev_init_device_ctx(struct device_context* d_ctx) {
-    CHECK(u_array_init(&d_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+int dev_init_device_ctx(struct device_context* dev_ctx) {
+    CHECK(u_array_init(&dev_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
     return 0;
 err:
     ERR_LOG("e_init_device_ctx");
+    return -1;
+}
+
+int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx) {
+    while (dev_ctx->devices.r.length > 0) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, 0) == -1);
+        CHECK(e_epoll_close_remove_simple(ep_ctx, &dev->stream) == -1);
+        CHECK(u_array_remove(&dev_ctx->devices.r, 0) == -1);
+    }
+    CHECK(u_array_free(&dev_ctx->devices.r) == -1);
+    return 0;
+err:
+    ERR_LOG("dev_close_device_ctx");
     return -1;
 }
 

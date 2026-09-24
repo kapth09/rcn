@@ -64,8 +64,6 @@ struct epoll_stream {
 struct epoll_context {
     epoll_stream_arr stream_ptrs;    // stores pointers to struct epoll_stream
     int epoll_fd;
-    int relay_count;
-    int peer_count;
 };
 
 enum daemon_type {
