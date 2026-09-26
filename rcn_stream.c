@@ -29,7 +29,7 @@ err:
     return -1;
 }
 
-int stream_queue_reading(struct epoll_stream* stream, enum stream_type type) {
+static int stream_queue_reading(struct epoll_stream* stream, enum stream_type type) {
     struct stream_item stream_data = {};
     stream_data.state = STREAM_STREAMING_HEADER;
     stream_data.op = STREAM_OP_READING;
@@ -49,7 +49,23 @@ err:
     return -1;
 }
 
-int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stream, enum stream_type type, int header, size_t size, void* data) {
+int stream_queue_reading_socket(struct epoll_stream* stream) {
+    CHECK(stream_queue_reading(stream, STREAM_TYPE_SOCKET) == -1);
+    return 0;
+err:
+    ERR_LOG("stream_queue_reading_socket");
+    return -1;
+}
+
+int stream_queue_reading_device(struct epoll_stream* stream) {
+    CHECK(stream_queue_reading(stream, STREAM_TYPE_DEVICE) == -1);
+    return 0;
+err:
+    ERR_LOG("stream_queue_reading_device");
+    return -1;
+}
+
+static int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stream, enum stream_type type, int header, size_t size, void* data) {
     struct stream_item stream_data = {};
     stream_data.state = STREAM_STREAMING_HEADER;
     stream_data.op = STREAM_OP_WRITING;
@@ -70,6 +86,22 @@ int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stre
     return 0;
 err:
     ERR_LOG("stream_set_writing");
+    return -1;
+}
+
+int stream_queue_writing_socket(struct epoll_context* ep_ctx, struct epoll_stream* stream, int header, size_t size, void* data) {
+    CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_SOCKET, header, size, data) == -1);
+    return 0;
+err:
+    ERR_LOG("stream_queue_writing_socket");
+    return -1;
+}
+
+int stream_queue_writing_device(struct epoll_context* ep_ctx, struct epoll_stream* stream, struct input_event event) {
+    CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_SOCKET, 0, 0, &event) == -1);
+    return 0;
+err:
+    ERR_LOG("stream_queue_writing_socket");
     return -1;
 }
 

@@ -88,7 +88,7 @@ int dev_init_device_arr(struct epoll_context* ep_ctx, struct device_context* dev
         CHECK(u_array_getv(&dev_paths->r, &dev_path, i) == -1);
         struct device* dev = {};
         CHECK(dev_init_device(ep_ctx, &dev_ctx->devices, dev_path, &dev) == -1);
-        CHECK(stream_queue_writing(ep_ctx, p_ctx->peer_stream, STREAM_TYPE_SOCKET, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &dev->info) == -1);
+        CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &dev->info) == -1);
     }
     return 0;
 err:
@@ -209,7 +209,7 @@ err:
     return -1;
 }
 
-int emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
+int dev_emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
     struct device *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);

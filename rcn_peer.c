@@ -32,9 +32,6 @@ static int handler_event(struct d_context* d_ctx, struct epoll_stream* stream, s
     (void)stream;
     (void)stream_item;
     return 0;
-//err:
-    ERR_LOG("handler_event");
-    return -1;
 }
 
 static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {

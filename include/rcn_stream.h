@@ -5,8 +5,10 @@
 
 int stream_stream(struct epoll_stream* stream);
 int stream_init(struct epoll_stream* stream, int fd, enum fd_type type);
-int stream_queue_reading(struct epoll_stream* stream, enum stream_type type);
-int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_stream* stream, enum stream_type type, int header, size_t size, void* data);
+int stream_queue_reading_socket(struct epoll_stream* stream);
+int stream_queue_reading_device(struct epoll_stream*);
+int stream_queue_writing_socket(struct epoll_context* ep_ctx, struct epoll_stream* stream, int header, size_t size, void* data);
+int stream_queue_writing_device(struct epoll_context* ep_ctx, struct epoll_stream* stream, struct input_event event);
 int stream_set_default(struct epoll_stream* stream, enum stream_operation default_op, enum stream_type default_type);
 int stream_clear_fallback(struct epoll_stream* stream);
 int stream_collect(struct epoll_stream* stream, struct stream_item** stream_data);
