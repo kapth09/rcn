@@ -33,16 +33,15 @@ static int stream_queue_reading(struct epoll_stream* stream, enum stream_type ty
     struct stream_item stream_data = {};
     stream_data.state = STREAM_STREAMING_HEADER;
     stream_data.op = STREAM_OP_READING;
+    stream_data.type = type;
     if (type == STREAM_TYPE_SOCKET) {
         stream_data.payload.msg.header = (struct stream_header){};
     } else if (type == STREAM_TYPE_DEVICE) {
         stream_data.payload.evt = (struct input_event){};
     }
     stream_data.buffer_streamed = 0;
-    const bool was_empty = stream->queue.r.is_empty;
     CHECK(u_queue_push(&stream->queue.r,  &stream_data) == -1);
-    if (was_empty)
-        CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
+    CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
     return 0;
 err:
     ERR_LOG("stream_set_reading");
@@ -69,6 +68,7 @@ static int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_strea
     struct stream_item stream_data = {};
     stream_data.state = STREAM_STREAMING_HEADER;
     stream_data.op = STREAM_OP_WRITING;
+    stream_data.type = type;
     if (type == STREAM_TYPE_SOCKET) {
         stream_data.payload.msg.header.value = header;
         stream_data.payload.msg.header.size = size;
@@ -78,10 +78,8 @@ static int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_strea
     } else if (type == STREAM_TYPE_DEVICE) {
         stream_data.payload.evt = *(struct input_event*)data;
     }
-    bool was_empty = stream->queue.r.is_empty;
     CHECK(u_queue_push(&stream->queue.r, &stream_data) == -1);
-    if (was_empty)
-        CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
+    CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
     CHECK(e_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
@@ -98,7 +96,7 @@ err:
 }
 
 int stream_queue_writing_device(struct epoll_context* ep_ctx, struct epoll_stream* stream, struct input_event event) {
-    CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_SOCKET, 0, 0, &event) == -1);
+    CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_DEVICE, 0, 0, &event) == -1);
     return 0;
 err:
     ERR_LOG("stream_queue_writing_socket");

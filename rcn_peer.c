@@ -9,8 +9,8 @@
 
 static int handler_dev_crt(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream;
-    struct device* new_dev = stream_item->payload.msg.buffer;
-    CHECK(dev_create_udev(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, new_dev) == -1);
+    struct device_info* new_dev = stream_item->payload.msg.buffer;
+    CHECK(dev_init_udev(d_ctx->ep_ctx, &d_ctx->device_ctx->device_ptrs, new_dev) == -1);
     return 0;
 err:
     ERR_LOG("handler_dev_crt");
@@ -28,10 +28,13 @@ static int handler_dev_del(struct d_context* d_ctx, struct epoll_stream* stream,
 }
 
 static int handler_event(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
     (void)stream;
-    (void)stream_item;
+    struct peer_msg_event msg = *(struct peer_msg_event*)stream_item->payload.msg.buffer;
+    CHECK(dev_emit_event(d_ctx, msg) == -1);
     return 0;
+err:
+    ERR_LOG("handler_event");
+    return -1;
 }
 
 static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {

@@ -58,12 +58,12 @@ int e_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* devi
     struct epoll_stream* stream = TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
     CHECK(stream_init(stream, fd, type) == -1);
     CHECK(u_array_add(&ep_ctx->stream_ptrs.r, &stream) == -1);
+    stream->fd_type= type;
+    device->stream = stream;
     struct epoll_event u_evt = {};
     u_evt.events = EPOLLIN;
     u_evt.data.ptr = stream;
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
-    stream->fd_type= type;
-    device->stream = *stream;
     return 0;
 err:
     ERR_LOG("d_epoll_add");

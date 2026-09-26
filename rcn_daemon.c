@@ -57,8 +57,9 @@ int d_print_log(enum daemon_type d_type) {
         log = RCN_CLIENT_LOG_PATH;
     FILE* log_file = TRY(fopen(log, "r"), NULL);
     char buffer[256] = { 0 };
-    while (fread(buffer, sizeof(char), sizeof(buffer), log_file) > 0)
-        printf("%s", buffer);
+    size_t bytes_read = 0;
+    while ((bytes_read = fread(buffer, sizeof(char), sizeof(buffer), log_file)) > 0)
+        fwrite(buffer, sizeof(char), bytes_read, stdout);
     CHECK(ferror(log_file) > 0);
     fclose(log_file);
     return 0;
@@ -186,6 +187,7 @@ static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buf
                 break;
             }
             case FD_UDEV: {
+                CHECK(stream_stream(stream) == -1);
                 break;
             }
         }
@@ -226,6 +228,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
                 CHECK(dev_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
+            case FD_UDEV: break;
             case FD_ISOCK: return 0;
             case FD_USOCK: return 0;
             default: ERR_GOTO(err, "err: invalid entry-type\n");
@@ -234,7 +237,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
     }
     return 0;
 err:
-    ERR_LOG("resolve_fd_context");
+    ERR_LOG("resolve_fd_streams");
     return -1;
 }
 
@@ -302,7 +305,7 @@ static int d_init(struct daemon_arg arg) {
     CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.type) == -1);
 
     if (arg.type == DAEMON_CLIENT) {
-        CHECK(dev_init_device_arr(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
+        CHECK(dev_init_devices_arg(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
         CHECK(u_array_free(&arg.devices_arg->r) == -1);
     }
 

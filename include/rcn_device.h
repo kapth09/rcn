@@ -34,23 +34,23 @@ struct device_info {
 
 struct device {
     struct device_info info;
-    struct epoll_stream stream;
+    struct epoll_stream* stream;
 };
 
 struct device_context {
-    device_ptr_arr devices;
+    device_arr device_ptrs;
 };
 
-int dev_init_device_arr(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
-int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device** out_dev);
+int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
+int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev);
 int dev_init_device_ctx(struct device_context* dev_ctx);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
-int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);
+int dev_grab_device_by_id(device_arr* devices, size_t random_id, bool grab);
 int dev_grab_device_by_ptr(struct device* dev, bool grab);
 int dev_get_device_info(int dev_fd, struct device* dev);
-int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev);
+int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device_info* info_template);
 int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
-int dev_emit_event(device_ptr_arr *devices, struct peer_msg_event event);
+int dev_emit_event(struct d_context* d_ctx, struct peer_msg_event event);
 
 #endif //RCN_RCN_DEV_H

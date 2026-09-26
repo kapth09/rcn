@@ -5,7 +5,7 @@
 #include <linux/input.h>
 
 U_DEFINE_ARR(epoll_stream_arr, struct epoll_stream*);
-U_DEFINE_ARR(device_ptr_arr, struct device*);
+U_DEFINE_ARR(device_arr, struct device);
 U_DEFINE_ARR(char_arr, char);
 
 U_DEFINE_QUEUE(stream_queue, struct stream_data);

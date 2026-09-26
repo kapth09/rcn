@@ -26,7 +26,7 @@ err:
 
 static int has_any_active_inputs(struct device* device) {
     if (HAS_BIT(device->info.evtbit, EV_KEY)) {
-        if (TRY(has_active_key(device->stream.fd), -1) == 1)
+        if (TRY(has_active_key(device->stream->fd), -1) == 1)
             return 1;
     }
     return 0;
@@ -61,12 +61,12 @@ err:
     return -1;
 }
 
-int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device** out_dev) {
+int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev) {
     *out_dev = TRY(calloc(1, sizeof(struct device)), NULL);
     int dev_fd = TRY(open(dev_path, O_RDONLY | O_NONBLOCK), -1);
-    CHECK(dev_get_device_info(dev_fd, *out_dev) == -1);
     CHECK(e_epoll_add_device(ep_ctx, dev_fd, *out_dev, FD_DEV) == -1);
-    CHECK(u_array_add(&devices->r, out_dev) == -1);
+    CHECK(dev_get_device_info(dev_fd, *out_dev) == -1);
+    CHECK(u_array_add(&devices->r, *out_dev) == -1);
     return 0;
 err:
     *out_dev = NULL;
@@ -75,19 +75,19 @@ err:
 }
 
 int dev_init_device_ctx(struct device_context* dev_ctx) {
-    CHECK(u_array_init(&dev_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+    CHECK(u_array_init(&dev_ctx->device_ptrs.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
     return 0;
 err:
     ERR_LOG("e_init_device_ctx");
     return -1;
 }
 
-int dev_init_device_arr(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths) {
+int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths) {
     for (size_t i = 0; i < dev_paths->r.length; i++) {
         char* dev_path = {};
         CHECK(u_array_getv(&dev_paths->r, &dev_path, i) == -1);
         struct device* dev = {};
-        CHECK(dev_init_device(ep_ctx, &dev_ctx->devices, dev_path, &dev) == -1);
+        CHECK(dev_init_device(ep_ctx, &dev_ctx->device_ptrs, dev_path, &dev) == -1);
         CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &dev->info) == -1);
     }
     return 0;
@@ -97,20 +97,20 @@ err:
 }
 
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx) {
-    while (dev_ctx->devices.r.length > 0) {
+    while (dev_ctx->device_ptrs.r.length > 0) {
         struct device* dev = {};
-        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, 0) == -1);
-        CHECK(e_epoll_close_remove_simple(ep_ctx, &dev->stream) == -1);
-        CHECK(u_array_remove(&dev_ctx->devices.r, 0) == -1);
+        CHECK(u_array_getr(&dev_ctx->device_ptrs.r, (void**)&dev, 0) == -1);
+        CHECK(e_epoll_close_remove_simple(ep_ctx, dev->stream) == -1);
+        CHECK(u_array_remove(&dev_ctx->device_ptrs.r, 0) == -1);
     }
-    CHECK(u_array_free(&dev_ctx->devices.r) == -1);
+    CHECK(u_array_free(&dev_ctx->device_ptrs.r) == -1);
     return 0;
 err:
     ERR_LOG("dev_close_device_ctx");
     return -1;
 }
 
-int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab) {
+int dev_grab_device_by_id(device_arr* devices, size_t random_id, bool grab) {
     struct device* dev;
     CHECK(find_device(&devices->r, &dev,random_id) == -1);
     CHECK(drain_events(dev) == -1);
@@ -131,8 +131,6 @@ err:
 }
 
 int dev_get_device_info(int dev_fd, struct device* device) {
-    memset(device, 0, sizeof(struct device));
-    device->stream.fd = dev_fd;
     struct device_info* info = &device->info;
     CHECK(getrandom(&device->info.random_id, sizeof(device->info.random_id), 0) == -1);
     CHECK(ioctl(dev_fd, EVIOCGID, &info->dev_id) == -1);
@@ -166,41 +164,51 @@ err:
     return -1;
 }
 
-int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struct device* new_dev) {
-    int u_fd = -1;
-    u_fd = TRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK), -1);
-    struct device_info* info = &new_dev->info;
+static int apply_udev_info(int u_fd, struct device* device, struct device_info* template) {
     CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_SYN) == -1);
-    CHECK(set_udev_bits(u_fd, UI_SET_PROPBIT, info->propbit, INPUT_PROP_MAX) == -1);
-    if (HAS_BIT(info->evtbit, EV_KEY)) {
+    CHECK(set_udev_bits(u_fd, UI_SET_PROPBIT, template->propbit, INPUT_PROP_MAX) == -1);
+    if (HAS_BIT(template->evtbit, EV_KEY)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_KEY) == -1);
-        CHECK(set_udev_bits(u_fd, UI_SET_KEYBIT, info->keybit, KEY_MAX) == -1);
+        CHECK(set_udev_bits(u_fd, UI_SET_KEYBIT, template->keybit, KEY_MAX) == -1);
     }
-    if (HAS_BIT(info->evtbit, EV_REL)) {
+    if (HAS_BIT(template->evtbit, EV_REL)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_REL) == -1);
-        CHECK(set_udev_bits(u_fd, UI_SET_RELBIT, info->relbit, REL_MAX) == -1);
+        CHECK(set_udev_bits(u_fd, UI_SET_RELBIT, template->relbit, REL_MAX) == -1);
     }
-    if (HAS_BIT(info->evtbit, EV_ABS)) {
+    if (HAS_BIT(template->evtbit, EV_ABS)) {
         CHECK(ioctl(u_fd, UI_SET_EVBIT, EV_ABS) == -1);
         for (int i = 0; i < ABS_MAX; i++) {
-            if (!HAS_BIT(info->absbit, i))
+            if (!HAS_BIT(template->absbit, i))
                 continue;
             CHECK(ioctl(u_fd, UI_SET_ABSBIT, i) == -1);
             struct uinput_abs_setup abs_setup = { 0 };
             abs_setup.code = i;
-            abs_setup.absinfo = info->absinfo[i];
+            abs_setup.absinfo = template->absinfo[i];
             CHECK(ioctl(u_fd, UI_ABS_SETUP, &abs_setup) == -1);
         }
     }
-    new_dev->stream.fd = u_fd;
-    struct uinput_setup setup = { .id = info->dev_id };
+    struct uinput_setup setup = {};
+    setup.id = template->dev_id;
     char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
-    snprintf(tmp_buff, sizeof(tmp_buff), "RCN-VIRT-%s", info->name);
+    snprintf(tmp_buff, sizeof(tmp_buff), "RCN-VIRT-%s", template->name);
     strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
+    strncpy(template->name, tmp_buff, UINPUT_MAX_NAME_SIZE);
+    memcpy(&device->info, template, sizeof(struct device_info));
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
-    CHECK(u_array_add(&devices->r, new_dev) == -1);
-    CHECK(e_epoll_add(ep_ctx, u_fd, FD_DEV) == -1);
+    return 0;
+err:
+    ERR_LOG("apply_udev_info");
+    return -1;
+}
+
+int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device_info* template) {
+    int u_fd = -1;
+    u_fd = TRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK), -1);
+    struct device* device = TRY(calloc(1, sizeof(struct device)), NULL);
+    CHECK(apply_udev_info(u_fd, device, template) == -1);
+    CHECK(e_epoll_add_device(ep_ctx, u_fd, device, FD_UDEV) == -1);
+    CHECK(u_array_add(&devices->r, device) == -1);
     return 0;
 err:
     if (u_fd != -1)
@@ -209,25 +217,29 @@ err:
     return -1;
 }
 
-int dev_emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
+int dev_emit_event(struct d_context* d_ctx, struct peer_msg_event event) {
     struct device *dev = NULL;
+    device_arr* devices = &d_ctx->device_ctx->device_ptrs;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
         if (dev->info.random_id == event.random_id)
             break;
     }
     CHECK(dev == NULL);
+    CHECK(stream_queue_writing_device(d_ctx->ep_ctx, dev->stream, event.evt_data) == -1);
     if (event.evt_data.type == EV_SYN)
-        printf("syn\n");
+        printf("emit syn\n");
+    else
+        printf("emit event\n");
     return 0;
-    err:
-        ERR_LOG("emit_event");
+err:
+    ERR_LOG("emit_event");
     return -1;
 }
 
 int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
-    size_t index = TRY(u_array_find_index(&dev_ctx->devices.r, &stream), -1);
-    CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
+    size_t index = TRY(u_array_find_index(&dev_ctx->device_ptrs.r, &stream), -1);
+    CHECK(u_array_remove(&dev_ctx->device_ptrs.r, index) == -1);
     return 0;
 err:
     ERR_LOG("e_close_dev");
@@ -235,8 +247,21 @@ err:
 }
 
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
+    bool found_dev = false;
+    for (size_t i = 0; i < d_ctx->device_ctx->device_ptrs.r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&d_ctx->device_ctx->device_ptrs.r, (void**)&dev, i) == -1);
+        if (dev->stream != stream)
+            continue;
+        found_dev = true;
+        struct peer_msg_event msg = {};
+        msg.evt_data = stream_item->payload.evt;
+        msg.random_id = dev->info.random_id;
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_EVENT, sizeof(struct peer_msg_event), &msg) == -1);
+    }
+    CHECK(found_dev == false);
     return 0;
+err:
+    ERR_LOG("dev_handler");
+    return -1;
 }
