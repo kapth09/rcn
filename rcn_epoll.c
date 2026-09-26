@@ -80,7 +80,7 @@ err:
 }
 
 int e_epoll_sync_stream(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
-    enum EPOLL_EVENTS events = stream->next->op == STREAM_WRITING ? EPOLLOUT : EPOLLIN;
+    enum EPOLL_EVENTS events = stream->next->op == STREAM_OP_WRITING ? EPOLLOUT : EPOLLIN;
     struct epoll_event evt = {};
     evt.events = events;
     evt.data.ptr = stream;

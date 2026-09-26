@@ -201,11 +201,11 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
         struct epoll_event evt = epoll_buff[i];
         struct epoll_stream* stream = evt.data.ptr;
         struct stream_item* stream_item = stream->next;
-        if (stream_item->state == STREAM_CLOSED) {
+        if (stream_item->state == STREAM_STREAMING_CLOSED) {
             CHECK(e_epoll_close_remove(d_ctx, stream) == -1);
             continue;
         }
-        if (stream_item->state != STREAM_COMPLETE) {
+        if (stream_item->state != STREAM_STREAMING_COMPLETE) {
             continue;
         }
         CHECK(stream_collect(stream, &stream_item) == -1);
@@ -302,7 +302,7 @@ static int d_init(struct daemon_arg arg) {
     CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.type) == -1);
 
     if (arg.type == DAEMON_CLIENT) {
-        // init_arg_devices
+        CHECK(dev_init_device_arr(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
         CHECK(u_array_free(&arg.devices_arg->r) == -1);
     }
 

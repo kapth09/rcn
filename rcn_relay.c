@@ -76,7 +76,7 @@ int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* rel
     for (size_t i = 0; i < relay_streams->r.length; i++) {
         struct epoll_stream* relay_stream = {};
         CHECK(u_array_getv(&relay_streams->r, &relay_stream, i) == -1);
-        CHECK(stream_queue_writing(ep_ctx, relay_stream, header, 0, NULL) == -1);
+        CHECK(stream_queue_writing(ep_ctx, relay_stream, STREAM_TYPE_SOCKET, header, 0, NULL) == -1);
     }
     return 0;
 err:
@@ -103,8 +103,8 @@ static int sleep_usock() {
     CHECK(remaining == 0);
     return 0;
 err:
-    fprintf(stderr, "\r");
-    ERR_LOG("sleep_usock: relay timeout, no response from server\n");
+    errno = ETIMEDOUT;
+    fprintf(stderr, "\rerr: sleep_usock: relay timeout, no response from daemon\n");
     return -1;
 }
 
@@ -142,7 +142,7 @@ err:
 
 static int handler_start(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
-    CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_START, 0, NULL) == -1);
+    CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, STREAM_TYPE_SOCKET, RELAY_HEADER_START, 0, NULL) == -1);
     return 0;
 err:
     ERR_LOG("handler_start");
@@ -152,14 +152,14 @@ err:
 static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
     if (d_ctx->state == RCN_PAUSED) {
-        CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_PAUSE_AGAIN, 0, NULL) == -1);
+        CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, STREAM_TYPE_SOCKET, RELAY_HEADER_PAUSE_AGAIN, 0, NULL) == -1);
         return 0;
     }
     if (d_ctx->type == DAEMON_CLIENT) {}
     // TODO: ungrab devices
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
-    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
+    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, STREAM_TYPE_SOCKET, PEER_HEADER_PAUSE, 0, NULL) == -1);
     d_ctx->state = RCN_PAUSED;
     return 0;
 err:
@@ -170,12 +170,12 @@ err:
 static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
     if (d_ctx->state == RCN_RUNNING) {
-        CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, RELAY_HEADER_RESUME_AGAIN, 0, NULL) == -1);
+        CHECK(stream_queue_writing(d_ctx->ep_ctx, stream, STREAM_TYPE_SOCKET, RELAY_HEADER_RESUME_AGAIN, 0, NULL) == -1);
         return 0;
     }
     if (d_ctx->type == DAEMON_CLIENT) {}
     // TODO: regrab devices
-    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_RESUME, 0, NULL) == -1);
+    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, STREAM_TYPE_SOCKET, PEER_HEADER_RESUME, 0, NULL) == -1);
     d_ctx->state = RCN_RUNNING;
     return 0;
 err:
@@ -190,7 +190,7 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     d_ctx->exit = true;
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
-    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
+    CHECK(stream_queue_writing(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, STREAM_TYPE_SOCKET, PEER_HEADER_STOP, 0, NULL) == -1);
     return 0;
 err:
     ERR_LOG("handler_stop");
@@ -198,7 +198,7 @@ err:
 }
 
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    switch (stream_item->msg.header.value) {
+    switch (stream_item->payload.msg.header.value) {
         case RELAY_HEADER_IDLE: {
             /* do nothing, relay hangs on blocking read() */
             break;
@@ -219,7 +219,7 @@ int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
             CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
             break;
         }
-        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->msg.header.value);
+        default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->payload.msg.header.value);
     }
     return 0;
 err:

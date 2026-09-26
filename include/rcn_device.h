@@ -18,6 +18,7 @@
 /* forward declarations */
 struct d_context;
 struct peer_msg_event;
+struct peer_context;
 
 struct device_info {
     uint8_t evtbit[MAX_EVT_BYTES];
@@ -28,19 +29,20 @@ struct device_info {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
+    size_t random_id;
 };
 
 struct device {
     struct device_info info;
     struct epoll_stream stream;
-    size_t random_id;
 };
 
 struct device_context {
     device_ptr_arr devices;
 };
 
-int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev);
+int dev_init_device_arr(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
+int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device** out_dev);
 int dev_init_device_ctx(struct device_context* dev_ctx);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_id(device_ptr_arr* devices, size_t random_id, bool grab);

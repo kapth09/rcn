@@ -8,11 +8,11 @@
 #include <unistd.h>
 
 static int handler_dev_crt(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
     (void)stream;
-    (void)stream_item;
+    struct device* new_dev = stream_item->payload.msg.buffer;
+    CHECK(dev_create_udev(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, new_dev) == -1);
     return 0;
-//err:
+err:
     ERR_LOG("handler_dev_crt");
     return -1;
 }
@@ -83,7 +83,7 @@ err:
 }
 
 int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    switch (stream_item->msg.header.value) {
+    switch (stream_item->payload.msg.header.value) {
         case PEER_HEADER_DEV_CRT: {
             CHECK(handler_dev_crt(d_ctx, stream, stream_item) == -1);
             break;
@@ -108,7 +108,7 @@ int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
             CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
             break;
         }
-        default: ERR_GOTO(err, "err: unknown peer header '%d'\n", stream_item->msg.header.value);
+        default: ERR_GOTO(err, "err: unknown peer header '%d'\n", stream_item->payload.msg.header.value);
     }
     return 0;
 err:
@@ -120,12 +120,12 @@ int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, in
     if (d_type == DAEMON_SERVER) {
         p_ctx->peer_stream = NULL;
         CHECK(e_epoll_add_getr(ep_ctx, isock_fd, FD_ISOCK, &p_ctx->isock_stream) == -1);
-        CHECK(stream_set_default(p_ctx->isock_stream, STREAM_READING) == -1);
+        CHECK(stream_set_default(p_ctx->isock_stream, STREAM_OP_READING, STREAM_TYPE_SOCKET) == -1);
         p_ctx->peer_state = PEER_DISCONNECTED;
     } else if (d_type == DAEMON_CLIENT) {
         p_ctx->isock_stream = NULL;
         CHECK(e_epoll_add_getr(ep_ctx, isock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
-        CHECK(stream_set_default(p_ctx->peer_stream, STREAM_READING) == -1);
+        CHECK(stream_set_default(p_ctx->peer_stream, STREAM_OP_READING, STREAM_TYPE_SOCKET) == -1);
         p_ctx->peer_state = PEER_CONNECTED;
     }
     return 0;

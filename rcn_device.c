@@ -2,6 +2,7 @@
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
 #include "include/rcn_epoll.h"
+#include "include/rcn_stream.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,7 @@ err:
 static int find_device(struct u_array* devices, struct device** out_device, size_t random_it) {
     for (size_t i = 0; i < devices->length; i++) {
         CHECK(u_array_getr(devices, (void**)out_device, i) == -1);
-        if ((*out_device)->random_id== random_it) {
+        if ((*out_device)->info.random_id== random_it) {
             return 0;
         }
     }
@@ -60,14 +61,15 @@ err:
     return -1;
 }
 
-int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device* out_dev) {
+int dev_init_device(struct epoll_context* ep_ctx, device_ptr_arr* devices, const char *dev_path, struct device** out_dev) {
+    *out_dev = TRY(calloc(1, sizeof(struct device)), NULL);
     int dev_fd = TRY(open(dev_path, O_RDONLY | O_NONBLOCK), -1);
-    CHECK(dev_get_device_info(dev_fd, out_dev) == -1);
-    CHECK(e_epoll_add_device(ep_ctx, dev_fd, out_dev, FD_DEV) == -1);
+    CHECK(dev_get_device_info(dev_fd, *out_dev) == -1);
+    CHECK(e_epoll_add_device(ep_ctx, dev_fd, *out_dev, FD_DEV) == -1);
     CHECK(u_array_add(&devices->r, out_dev) == -1);
     return 0;
 err:
-    out_dev = NULL;
+    *out_dev = NULL;
     ERR_LOG("client init_dev");
     return -1;
 }
@@ -77,6 +79,20 @@ int dev_init_device_ctx(struct device_context* dev_ctx) {
     return 0;
 err:
     ERR_LOG("e_init_device_ctx");
+    return -1;
+}
+
+int dev_init_device_arr(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths) {
+    for (size_t i = 0; i < dev_paths->r.length; i++) {
+        char* dev_path = {};
+        CHECK(u_array_getv(&dev_paths->r, &dev_path, i) == -1);
+        struct device* dev = {};
+        CHECK(dev_init_device(ep_ctx, &dev_ctx->devices, dev_path, &dev) == -1);
+        CHECK(stream_queue_writing(ep_ctx, p_ctx->peer_stream, STREAM_TYPE_SOCKET, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &dev->info) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("dev_init_device_arr");
     return -1;
 }
 
@@ -118,7 +134,7 @@ int dev_get_device_info(int dev_fd, struct device* device) {
     memset(device, 0, sizeof(struct device));
     device->stream.fd = dev_fd;
     struct device_info* info = &device->info;
-    CHECK(getrandom(&device->random_id, sizeof(device->random_id), 0) == -1);
+    CHECK(getrandom(&device->info.random_id, sizeof(device->info.random_id), 0) == -1);
     CHECK(ioctl(dev_fd, EVIOCGID, &info->dev_id) == -1);
     CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(info->name)-1), info->name) == -1);
     CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(info->evtbit)), info->evtbit) == -1);
@@ -179,7 +195,7 @@ int dev_create_udev(struct epoll_context* ep_ctx, device_ptr_arr* devices, struc
     new_dev->stream.fd = u_fd;
     struct uinput_setup setup = { .id = info->dev_id };
     char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
-    snprintf(tmp_buff, sizeof(tmp_buff), "(rcn-virt) %s", info->name);
+    snprintf(tmp_buff, sizeof(tmp_buff), "RCN-VIRT-%s", info->name);
     strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     CHECK(ioctl(u_fd, UI_DEV_SETUP, &setup) == -1);
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
@@ -197,7 +213,7 @@ int emit_event(device_ptr_arr *devices, struct peer_msg_event event) {
     struct device *dev = NULL;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
-        if (dev->random_id == event.random_id)
+        if (dev->info.random_id == event.random_id)
             break;
     }
     CHECK(dev == NULL);

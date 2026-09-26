@@ -2,6 +2,7 @@
 #define RCN_RCN_TYPES_H
 
 #include "rcn_util.h"
+#include <linux/input.h>
 
 U_DEFINE_ARR(epoll_stream_arr, struct epoll_stream*);
 U_DEFINE_ARR(device_ptr_arr, struct device*);
@@ -23,16 +24,21 @@ enum fd_type {
     FD_DEV,
 };
 
+enum stream_type {
+    STREAM_TYPE_SOCKET,
+    STREAM_TYPE_DEVICE,
+};
+
 enum stream_state {
     STREAM_STREAMING_HEADER,
     STREAM_STREAMING_BODY,
-    STREAM_COMPLETE,
-    STREAM_CLOSED,
+    STREAM_STREAMING_COMPLETE,
+    STREAM_STREAMING_CLOSED,
 };
 
 enum stream_operation {
-    STREAM_WRITING,
-    STREAM_READING,
+    STREAM_OP_WRITING,
+    STREAM_OP_READING,
 };
 
 struct stream_header {
@@ -46,8 +52,12 @@ struct stream_msg {
 };
 
 struct stream_item {
-    struct stream_msg msg;
+    union {
+        struct stream_msg msg;
+        struct input_event evt;
+    } payload;
     size_t buffer_streamed;
+    enum stream_type type;
     enum stream_state state;
     enum stream_operation op;
 };
@@ -57,6 +67,7 @@ struct epoll_stream {
     struct stream_item* next;
     stream_queue queue;
     enum stream_operation default_op;
+    enum stream_type default_type;
     enum fd_type fd_type;
     int fd;
 };
