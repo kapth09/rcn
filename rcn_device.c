@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/random.h>
 #include <unistd.h>
+#include <sys/epoll.h>
 
 static int has_active_key(int dev_fd) {
     if (dev_fd <= 0)
@@ -45,19 +46,6 @@ static int drain_events(struct device* dev) {
     return 0;
 err:
     ERR_LOG("drain_events");
-    return -1;
-}
-
-static int find_device(struct u_array* devices, struct device** out_device, size_t random_it) {
-    for (size_t i = 0; i < devices->length; i++) {
-        CHECK(u_array_getr(devices, (void**)out_device, i) == -1);
-        if ((*out_device)->info.random_id== random_it) {
-            return 0;
-        }
-    }
-err:
-    out_device = NULL;
-    ERR_LOG("find_device");
     return -1;
 }
 
@@ -110,20 +98,9 @@ err:
     return -1;
 }
 
-int dev_grab_device_by_id(device_arr* devices, size_t random_id, bool grab) {
-    struct device* dev;
-    CHECK(find_device(&devices->r, &dev,random_id) == -1);
+int dev_grab_device_by_ptr(struct device* dev, enum device_ctrl ctrl) {
     CHECK(drain_events(dev) == -1);
-    // CHECK(ioctl(dev.entry->fd, EVIOCGRAB, &grab) == -1);
-    return 0;
-err:
-    ERR_LOG("grab_dev_by_id");
-    return -1;
-}
-
-int dev_grab_device_by_ptr(struct device* dev, bool grab) {
-    CHECK(drain_events(dev) == -1);
-    // CHECK(ioctl(dev->entry->fd, EVIOCGRAB, &grab) == -1);
+    CHECK(ioctl(dev->stream->fd, EVIOCGRAB, ctrl == DEV_CTRL_CAPTURE) == -1);
     return 0;
 err:
     ERR_LOG("grab_dev_by_ptr");
@@ -217,7 +194,7 @@ err:
     return -1;
 }
 
-int dev_emit_event(struct d_context* d_ctx, struct peer_msg_event event) {
+int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event) {
     struct device *dev = NULL;
     device_arr* devices = &d_ctx->device_ctx->device_ptrs;
     for (size_t i = 0; i < devices->r.length; i++) {
@@ -227,13 +204,44 @@ int dev_emit_event(struct d_context* d_ctx, struct peer_msg_event event) {
     }
     CHECK(dev == NULL);
     CHECK(stream_queue_writing_device(d_ctx->ep_ctx, dev->stream, event.evt_data) == -1);
-    if (event.evt_data.type == EV_SYN)
-        printf("emit syn\n");
-    else
-        printf("emit event\n");
     return 0;
 err:
     ERR_LOG("emit_event");
+    return -1;
+}
+
+
+int dev_release_virt_keys(struct epoll_context* ep_ctx, struct device* device) {
+    struct input_event evt = {};
+    if (HAS_BIT(device->info.evtbit, EV_KEY)) {
+        for (int i = 0; i < KEY_MAX; i++) {
+            if (!HAS_BIT(device->info.keybit, i))
+                continue;
+            evt.type = EV_KEY;
+            evt.code = i;
+            evt.value = 0;
+            CHECK(stream_queue_writing_device(ep_ctx, device->stream, evt) == -1);
+        }
+        evt.type = EV_SYN;
+        evt.code = SYN_REPORT;
+        evt.value = 0;
+        CHECK(stream_queue_writing_device(ep_ctx, device->stream, evt) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("dev_release_virt_keys");
+    return -1;
+}
+
+int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices) {
+    for (size_t i = 0; i < devices->r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
+        CHECK(dev_release_virt_keys(ep_ctx, dev) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("dev_release_virt_keys_all");
     return -1;
 }
 
@@ -246,20 +254,42 @@ err:
     return -1;
 }
 
+int dev_ctrl_devices(struct d_context* d_ctx, device_arr* devices, enum device_ctrl ctrl) {
+    for (size_t i = 0; i < devices->r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
+        CHECK(dev_grab_device_by_ptr(dev, ctrl) == -1);
+        struct epoll_event ep_evt = {};
+        ep_evt.events = dev->stream->fd_type == FD_DEV ? EPOLLIN : EPOLLOUT;
+        ep_evt.data.ptr = dev->stream;
+        int res = 0;
+        if (ctrl == DEV_CTRL_RELEASE)
+            res = epoll_ctl(d_ctx->ep_ctx->epoll_fd, EPOLL_CTL_DEL, dev->stream->fd, &ep_evt);
+        else if (ctrl == DEV_CTRL_CAPTURE)
+            res = epoll_ctl(d_ctx->ep_ctx->epoll_fd, EPOLL_CTL_ADD, dev->stream->fd, &ep_evt);
+        CHECK(res == -1 && errno != EEXIST && errno != ENOENT);
+    }
+    return 0;
+err:
+    ERR_LOG("dev_ctrl_devices");
+    return -1;
+}
+
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     bool found_dev = false;
+    struct device* dev = {};
     for (size_t i = 0; i < d_ctx->device_ctx->device_ptrs.r.length; i++) {
-        struct device* dev = {};
         CHECK(u_array_getr(&d_ctx->device_ctx->device_ptrs.r, (void**)&dev, i) == -1);
         if (dev->stream != stream)
             continue;
         found_dev = true;
-        struct peer_msg_event msg = {};
-        msg.evt_data = stream_item->payload.evt;
-        msg.random_id = dev->info.random_id;
-        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_EVENT, sizeof(struct peer_msg_event), &msg) == -1);
+        break;
     }
     CHECK(found_dev == false);
+    struct peer_msg_event msg = {};
+    msg.evt_data = stream_item->payload.evt;
+    msg.random_id = dev->info.random_id;
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_EVENT, sizeof(struct peer_msg_event), &msg) == -1);
     return 0;
 err:
     ERR_LOG("dev_handler");

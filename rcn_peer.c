@@ -30,7 +30,7 @@ static int handler_dev_del(struct d_context* d_ctx, struct epoll_stream* stream,
 static int handler_event(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream;
     struct peer_msg_event msg = *(struct peer_msg_event*)stream_item->payload.msg.buffer;
-    CHECK(dev_emit_event(d_ctx, msg) == -1);
+    CHECK(dev_emit_event_msg(d_ctx, msg) == -1);
     return 0;
 err:
     ERR_LOG("handler_event");
@@ -41,8 +41,10 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
-    if (d_ctx->type == DAEMON_CLIENT) {}
-    // TODO: ungrab devices
+    if (d_ctx->type == DAEMON_CLIENT)
+        CHECK(dev_ctrl_devices(d_ctx, &d_ctx->device_ctx->device_ptrs, DEV_CTRL_RELEASE) == -1);
+    else if (d_ctx->type == DAEMON_SERVER)
+        CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->device_ptrs) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
     d_ctx->state = RCN_PAUSED;
@@ -55,8 +57,10 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
-    if (d_ctx->type == DAEMON_CLIENT) {}
-    // TODO: regrab devices
+    if (d_ctx->type == DAEMON_CLIENT)
+        CHECK(dev_ctrl_devices(d_ctx, &d_ctx->device_ctx->device_ptrs, DEV_CTRL_CAPTURE) == -1);
+    else if (d_ctx->type == DAEMON_SERVER)
+        CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->device_ptrs) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
     d_ctx->state = RCN_RUNNING;

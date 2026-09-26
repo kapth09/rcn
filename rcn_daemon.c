@@ -304,17 +304,18 @@ static int d_init(struct daemon_arg arg) {
         net_fd = TRY(init_peer_sock(arg.port, arg.host), -1);
     CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.type) == -1);
 
-    if (arg.type == DAEMON_CLIENT) {
-        CHECK(dev_init_devices_arg(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
-        CHECK(u_array_free(&arg.devices_arg->r) == -1);
-    }
-
     struct d_context d_ctx = {};
     d_ctx.ep_ctx = &ep_ctx;
     d_ctx.peer_ctx = &peer_ctx;
     d_ctx.relay_ctx = &relay_ctx;
     d_ctx.device_ctx = &device_ctx;
     d_ctx.type = arg.type;
+
+    if (arg.type == DAEMON_CLIENT) {
+        CHECK(dev_init_devices_arg(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
+        CHECK(dev_ctrl_devices(&d_ctx, &device_ctx.device_ptrs, DEV_CTRL_CAPTURE) == -1);
+        CHECK(u_array_free(&arg.devices_arg->r) == -1);
+    }
 
     CHECK(kill(relay_pid, SIGCONT) == -1);
     CHECK(d_loop(&d_ctx) == -1);
