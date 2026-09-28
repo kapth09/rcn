@@ -1,5 +1,6 @@
 #include "include/rcn.h"
 #include "include/rcn_epoll.h"
+#include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,7 @@ int e_init_epoll_ctx(struct epoll_context* ep_ctx) {
     CHECK(u_array_init(&ep_ctx->stream_ptrs.r, sizeof(struct epoll_stream*), RCN_STD_CAPACITY) == -1);
     return 0;
 err:
-    ERR_LOG("d_init_epoll");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -25,7 +26,7 @@ int e_close_epoll_ctx(struct epoll_context* ep_ctx) {
     close(ep_ctx->epoll_fd);
     return 0;
 err:
-    ERR_LOG("e_close_epoll_ctx");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -41,7 +42,7 @@ int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, st
     *out_stream = stream;
     return 0;
 err:
-    ERR_LOG("d_epoll_add");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -50,7 +51,7 @@ int e_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
     CHECK(e_epoll_add_getr(ep_ctx, fd, type, &tmp_stream) == -1);
     return 0;
 err:
-    ERR_LOG("d_epoll_add");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -66,7 +67,7 @@ int e_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* devi
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
     return 0;
 err:
-    ERR_LOG("d_epoll_add");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -75,7 +76,7 @@ int e_epoll_reset_stream(struct epoll_context* ep_ctx, struct epoll_stream* stre
     CHECK(e_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
-    ERR_LOG("epoll_reset_stream");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -87,7 +88,7 @@ int e_epoll_sync_stream(struct epoll_context* ep_ctx, struct epoll_stream* strea
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_MOD, stream->fd, &evt) == -1);
     return 0;
 err:
-    ERR_LOG("d_epoll_entry_update");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -102,7 +103,7 @@ int e_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
     CHECK(e_epoll_close_remove_simple(d_ctx->ep_ctx, stream) == -1);
     return 0;
 err:
-    ERR_LOG("d_epoll_close_remove");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -115,6 +116,6 @@ int e_epoll_close_remove_simple(struct epoll_context* ep_ctx, struct epoll_strea
     return 0;
 err:
     close(stream->fd);
-    ERR_LOG("e_epoll_close_remove_simple");
+    DEBUG_LOG("");
     return -1;
 }

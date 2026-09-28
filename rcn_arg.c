@@ -28,6 +28,7 @@ static const struct arg_handler handlers[] = {
     {ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, arg_host},
     {ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, arg_devices},
     {ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, arg_help},
+    {ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, arg_debug},
     {ARG_SUBACTION_PAUSE, ARG_SUBACTION_PAUSE, arg_daemon},
     {ARG_SUBACTION_RESUME, ARG_SUBACTION_RESUME, arg_daemon},
     {ARG_SUBACTION_STOP, ARG_SUBACTION_STOP, arg_daemon},
@@ -67,6 +68,10 @@ static void print_help() {
     printf("\n\t%s/%s: %s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
     printf("\tPossible values are:\n");
     printf("\t\t<(sub)action>\n");
+
+    printf("\n\t%s/%s: %s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
+    printf("\tAvailability:\n");
+    printf("\t\tAlways\n");
 }
 
 static int handle_arg(int argc, char** argv, int* i, struct arg_context* arg_ctx) {
@@ -86,7 +91,7 @@ static int handle_arg(int argc, char** argv, int* i, struct arg_context* arg_ctx
     }
     return 0;
 err:
-    ERR_LOG("handle_arg");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -100,7 +105,7 @@ static int validate_arg_ctx(struct arg_context* arg_ctx) {
     }
     return 0;
 err:
-    ERR_LOG("validate_arg_ctx");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -118,7 +123,7 @@ int arg_port(int argc, char** argv, int* i, struct arg_context* ctx) {
     ctx->port.info.provided = true;
     return 0;
 err:
-    ERR_LOG("arg_port");
+    DEBUG_LOG("");
     return -1;
 }
 int arg_host(int argc, char** argv, int* i, struct arg_context* ctx) {
@@ -132,7 +137,7 @@ int arg_host(int argc, char** argv, int* i, struct arg_context* ctx) {
     ctx->server.info.provided = true;
     return 0;
 err:
-    ERR_LOG("arg_host");
+    DEBUG_LOG("");
     return -1;
 }
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
@@ -148,7 +153,7 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     for (; *i < argc; (*i)++) {
         char* arg = argv[*i];
         for (int fi = 0; fi < handlers_length; fi++) {
-            if (strcmp(handlers[fi].flag, arg) == 0) {
+            if (strcmp(handlers[fi].flag, arg) == 0 || strcmp(handlers[fi].flag_long, arg) == 0) {
                 (*i)--;
                 goto end;
             }
@@ -159,7 +164,7 @@ end:
     ctx->devices.info.provided = true;
     return 0;
 err:
-    ERR_LOG("arg_devices");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -179,7 +184,7 @@ int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx) {
     ctx->daemon.info.provided = true;
     return 0;
 err:
-    ERR_LOG("arg_daemon");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -203,12 +208,25 @@ int arg_help(int argc, char** argv, int* i, struct arg_context* ctx) {
                 break;
             }
         }
-        CHECK(found_action == false);
+        if (found_action == false) {
+            EARG_UNKNOWN("action", action);
+        }
     }
     ctx->help.info.provided = true;
     return 0;
 err:
-    ERR_LOG("arg_help");
+    DEBUG_LOG("");
+    return -1;
+}
+
+int arg_debug(int argc, char** argv, int* i, struct arg_context* ctx) {
+    if (*i + 1 >= argc)
+        EARG_MISSING_VALUE(ARG_FLAG_DEBUG);
+    int debug = atoi(argv[++(*i)]);
+    *ctx->g_debug_level_ptr = debug;
+    return 0;
+err:
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -219,7 +237,6 @@ int parse_args(int argc, char** argv, int start_arg, struct arg_context* ctx) {
     CHECK(validate_arg_ctx(ctx) == -1);
     return 0;
 err:
-    ERR_LOG("parse_args");
     return -1;
 }
 
@@ -229,7 +246,7 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_RESUME: return RELAY_HEADER_RESUME;
         case SUBACTION_STOP: return RELAY_HEADER_STOP;
         default:
-            ERR_LOG("subaction_to_rcn_msg");
+            DEBUG_LOG("");
             return -1;
     }
 }

@@ -2,14 +2,14 @@
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
 #include "include/rcn_epoll.h"
+#include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <sys/epoll.h>
 #include <sys/random.h>
 #include <unistd.h>
-#include <sys/epoll.h>
 
 static int has_active_key(int dev_fd) {
     if (dev_fd <= 0)
@@ -22,7 +22,7 @@ static int has_active_key(int dev_fd) {
     }
     return 0;
 err:
-    ERR_LOG("has_active_key");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -33,7 +33,7 @@ static int has_any_active_inputs(struct device* device) {
     }
     return 0;
 err:
-    ERR_LOG("has_any_active_inputs");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -46,7 +46,7 @@ static int drain_events(struct device* dev) {
     }
     return 0;
 err:
-    ERR_LOG("drain_events");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -61,15 +61,20 @@ int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const cha
     return 0;
 err:
     *out_dev = NULL;
-    ERR_LOG("client init_dev");
+    DEBUG_LOG("");
     return -1;
 }
 
-int dev_init_device_ctx(struct device_context* dev_ctx) {
-    CHECK(u_array_init(&dev_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type) {
+    CHECK(u_array_init(&d_ctx->device_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
+    if (type == DAEMON_CLIENT) {
+        CHECK(dev_init_devices_arg(d_ctx->ep_ctx, d_ctx->device_ctx, d_ctx->peer_ctx, devices_arg) == -1);
+        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
+        CHECK(u_array_free(&devices_arg->r) == -1);
+    }
     return 0;
 err:
-    ERR_LOG("e_init_device_ctx");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -83,7 +88,7 @@ int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* de
     }
     return 0;
 err:
-    ERR_LOG("dev_init_device_arr");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -97,7 +102,7 @@ int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* de
     CHECK(u_array_free(&dev_ctx->devices.r) == -1);
     return 0;
 err:
-    ERR_LOG("dev_close_device_ctx");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -106,7 +111,7 @@ int dev_grab_device_by_ptr(struct device* dev, enum device_ctrl ctrl) {
     CHECK(ioctl(dev->stream->fd, EVIOCGRAB, ctrl == DEV_CTRL_CAPTURE) == -1);
     return 0;
 err:
-    ERR_LOG("grab_dev_by_ptr");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -129,7 +134,7 @@ int dev_get_device_info(int dev_fd, struct device* device) {
     }
     return 0;
 err:
-    ERR_LOG("e_get_device_info");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -140,7 +145,7 @@ static int set_udev_bits(int u_fd, unsigned long set_ioctl, uint8_t* bitmap, int
     }
     return 0;
 err:
-    ERR_LOG("set_udev_bits");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -178,7 +183,7 @@ static int apply_udev_info(int u_fd, struct device* device, struct device_info* 
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
     return 0;
 err:
-    ERR_LOG("apply_udev_info");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -193,7 +198,7 @@ int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct devi
 err:
     if (u_fd != -1)
         close(u_fd);
-    ERR_LOG("e_create_udev");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -216,7 +221,7 @@ int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event) {
     }
     return 0;
 err:
-    ERR_LOG("emit_event");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -238,7 +243,7 @@ int dev_release_virt_keys(struct epoll_context* ep_ctx, struct device* device) {
     }
     return 0;
 err:
-    ERR_LOG("dev_release_virt_keys");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -250,7 +255,7 @@ int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices)
     }
     return 0;
 err:
-    ERR_LOG("dev_release_virt_keys_all");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -259,11 +264,11 @@ int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
     CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
     return 0;
 err:
-    ERR_LOG("e_close_dev");
+    DEBUG_LOG("");
     return -1;
 }
 
-int dev_ctrl_devices(struct d_context* d_ctx, device_arr* devices, enum device_ctrl ctrl) {
+int dev_ctrl_devices(struct epoll_context* ep_ctx, device_arr* devices, enum device_ctrl ctrl) {
     for (size_t i = 0; i < devices->r.length; i++) {
         struct device* dev = {};
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
@@ -273,14 +278,14 @@ int dev_ctrl_devices(struct d_context* d_ctx, device_arr* devices, enum device_c
         ep_evt.data.ptr = dev->stream;
         int res = 0;
         if (ctrl == DEV_CTRL_RELEASE)
-            res = epoll_ctl(d_ctx->ep_ctx->epoll_fd, EPOLL_CTL_DEL, dev->stream->fd, &ep_evt);
+            res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, dev->stream->fd, &ep_evt);
         else if (ctrl == DEV_CTRL_CAPTURE)
-            res = epoll_ctl(d_ctx->ep_ctx->epoll_fd, EPOLL_CTL_ADD, dev->stream->fd, &ep_evt);
+            res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, dev->stream->fd, &ep_evt);
         CHECK(res == -1 && errno != EEXIST && errno != ENOENT);
     }
     return 0;
 err:
-    ERR_LOG("dev_ctrl_devices");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -301,6 +306,6 @@ int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct str
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_EVENT, sizeof(struct peer_msg_event), &msg) == -1);
     return 0;
 err:
-    ERR_LOG("dev_handler");
+    DEBUG_LOG("");
     return -1;
 }

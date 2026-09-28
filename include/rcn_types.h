@@ -10,6 +10,11 @@ U_DEFINE_ARR(char_arr, char);
 
 U_DEFINE_QUEUE(stream_queue, struct stream_data);
 
+enum debug_level {
+    DEBUG_OFF,
+    DEBUG_ON,
+};
+
 enum rcn_state {
     RCN_RUNNING,
     RCN_PAUSED,

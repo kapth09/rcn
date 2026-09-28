@@ -1,5 +1,6 @@
 #include "include/rcn.h"
 #include "include/rcn_epoll.h"
+#include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -7,9 +8,9 @@
 #include <linux/prctl.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -32,7 +33,7 @@ static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx
     p_ctx->peer_state = PEER_CONNECTED;
     return 0;
 err:
-    ERR_LOG("accept_isock");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -47,7 +48,7 @@ static int accept_usock(struct epoll_context* ep_ctx, epoll_stream_arr* relay_st
     CHECK(u_array_add(&relay_streams->r, &relay_stream) == -1);
     return 0;
 err:
-    ERR_LOG("accept_usock");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -66,7 +67,7 @@ int d_print_log(enum daemon_type d_type) {
     fclose(log_file);
     return 0;
 err:
-    ERR_LOG("d_print_log");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -75,7 +76,7 @@ int d_init_dir() {
     CHECK(rcn_dir == -1 && errno != EEXIST);
     return 0;
 err:
-    ERR_LOG("d_init_dir");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -92,7 +93,7 @@ int d_init_log(enum daemon_type d_type) {
     CHECK(setvbuf(stderr, NULL, _IONBF, 0) != 0);
     return 0;
 err:
-    ERR_LOG("d_init_log");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -107,13 +108,14 @@ static int resolve_host(const int port, const char *host, struct addrinfo** addr
         goto err;
     return 0;
 err:
-    ERR_LOG("%s", gai_strerror(res));
+    errno = EHOSTUNREACH;
+    DEBUG_LOG(" %s", gai_strerror(res));
     return -1;
 }
 
 static int init_peer_sock(const int port, const char *host) {
     const int isock_fd = TRY(socket(AF_INET, SOCK_STREAM, 0), -1);
-    const int timeout_ms = 5000;
+    const int timeout_ms = RCN_CONN_TIMEOUT_MS;
     CHECK(setsockopt(isock_fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout_ms, sizeof(timeout_ms)) == -1);
     const int no_delay = 1;
     CHECK(setsockopt(isock_fd, SOL_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay)) == -1);
@@ -135,7 +137,7 @@ static int init_peer_sock(const int port, const char *host) {
     CHECK(fcntl(isock_fd, F_SETFL, O_NONBLOCK | fd_flags) == -1);
     return isock_fd;
 err:
-    ERR_LOG("client init_psock");
+    ERR_LOG("");
     return -1;
 }
 
@@ -151,7 +153,7 @@ static int init_inet_sock(const int port) {
     CHECK(listen(isock_fd, 0) == -1);
     return isock_fd;
 err:
-    ERR_LOG("server init_psock");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -198,7 +200,7 @@ static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buf
     }
     return nfds;
 err:
-    ERR_LOG("dispatch_epoll");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -241,7 +243,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
     }
     return 0;
 err:
-    ERR_LOG("resolve_fd_streams");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -253,7 +255,7 @@ static int cleanup(struct d_context* d_ctx) {
     CHECK(e_close_epoll_ctx(ep_ctx) == -1); // close epoll_ctx last, as other ctx depend on its FD
     return 0;
 err:
-    ERR_LOG("cleanup");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -267,12 +269,11 @@ static int d_loop(struct d_context* d_ctx) {
     }
     return 0;
 err:
-    ERR_LOG("d_loop");
+    DEBUG_LOG("");
     return -1;
 }
 
 static int d_init(struct daemon_arg arg) {
-    pid_t relay_pid = getppid();
     if (arg.type == DAEMON_SERVER) {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_SERVER, 0UL, 0UL, 0UL) == -1);
     } else {
@@ -286,8 +287,14 @@ static int d_init(struct daemon_arg arg) {
     struct peer_context peer_ctx = {};
     struct device_context device_ctx = {};
 
+    struct d_context d_ctx = {};
+    d_ctx.ep_ctx = &ep_ctx;
+    d_ctx.peer_ctx = &peer_ctx;
+    d_ctx.relay_ctx = &relay_ctx;
+    d_ctx.device_ctx = &device_ctx;
+    d_ctx.type = arg.type;
+
     CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
-    CHECK(dev_init_device_ctx(&device_ctx) == -1);
 
     char* sock_path;
     size_t sock_len;
@@ -308,30 +315,24 @@ static int d_init(struct daemon_arg arg) {
         net_fd = TRY(init_peer_sock(arg.port, arg.host), -1);
     CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.type) == -1);
 
-    struct d_context d_ctx = {};
-    d_ctx.ep_ctx = &ep_ctx;
-    d_ctx.peer_ctx = &peer_ctx;
-    d_ctx.relay_ctx = &relay_ctx;
-    d_ctx.device_ctx = &device_ctx;
-    d_ctx.type = arg.type;
+    CHECK(dev_init_device_ctx(&d_ctx, arg.devices_arg, arg.type) == -1);
 
-    if (arg.type == DAEMON_CLIENT) {
-        CHECK(dev_init_devices_arg(&ep_ctx, &device_ctx, &peer_ctx, arg.devices_arg) == -1);
-        CHECK(dev_ctrl_devices(&d_ctx, &device_ctx.devices, DEV_CTRL_CAPTURE) == -1);
-        CHECK(u_array_free(&arg.devices_arg->r) == -1);
-    }
-
-    CHECK(kill(relay_pid, SIGCONT) == -1);
+    int64_t status_success = DAEMON_STATUS_OK;
+    CHECK(write(arg.evtfd, &status_success, sizeof(status_success)) == -1);
     CHECK(d_loop(&d_ctx) == -1);
     CHECK(cleanup(&d_ctx) == -1);
     return 0;
 err:
-    kill(relay_pid, SIGTSTP);
-    ERR_LOG("d_init");
+    int64_t status_err = errno;
+    CHECK(write(arg.evtfd, &status_err, sizeof(status_err)) == -1);
+    DEBUG_LOG("");
     return -1;
 }
 
 int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg) {
+    const int evtfd = eventfd(0, 0);
+    r_arg.evtfd = evtfd;
+    d_arg.evtfd = evtfd;
     const pid_t pid = fork();
     if (pid == 0)
         CHECK(d_init(d_arg) == -1);
@@ -339,6 +340,6 @@ int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg) {
         CHECK(relay_start(r_arg) == -1);
     return 0;
 err:
-    ERR_LOG("daemon_start");
+    DEBUG_LOG("");
     return -1;
 }

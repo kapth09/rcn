@@ -1,9 +1,10 @@
 #ifndef RCN_RCN_DAEMON_H
 #define RCN_RCN_DAEMON_H
 
-#include "rcn_peer.h"
 #include "rcn_device.h"
 #include "rcn_relay.h"
+
+#define DAEMON_STATUS_OK INT64_MAX
 
 struct d_context {
     struct epoll_context* ep_ctx;
@@ -16,6 +17,7 @@ struct d_context {
 };
 
 struct daemon_arg {
+    int evtfd;
     int port;
     char* host;
     char_arr* devices_arg;

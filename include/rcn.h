@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <stdio.h>
 
+extern enum debug_level g_debug_level;
+
 #define ERR_GOTO(label, ...) 					\
     do { 							            \
 	fprintf(stderr, __VA_ARGS__); 				\
@@ -23,11 +25,26 @@
 	goto label; 						                \
     } while (0)
 
-#define ERR_LOG(...)                                    \
+#define ERR_LOG(fmt, ...)										\
+    do {                                                		\
+        fprintf(stderr, "err: %s:%d", __func__, __LINE__);	    \
+        if ((fmt)[0] != 0){										\
+        fprintf(stderr, " " fmt, ##__VA_ARGS__);       			\
+		}														\
+		int tmp_errno = errno;									\
+        if (errno != 0) {										\
+		  fprintf(stderr, " [%s]", strerror(errno));     		\
+		  errno = 0;											\
+		}														\
+		errno = tmp_errno;										\
+		fprintf(stderr, "\n");									\
+    } while (0)
+
+#define DEBUG_LOG(...)                                  \
     do {                                                \
-        fprintf(stderr, "err: ");                       \
-        fprintf(stderr, __VA_ARGS__);       			\
-        fprintf(stderr, ": %s\n", strerror(errno));     \
+		if (g_debug_level == DEBUG_ON) {				\
+			ERR_LOG(__VA_ARGS__);						\
+		} 												\
     } while (0)
 
 #define CHECK(condition) 		    \
@@ -54,5 +71,7 @@
 #define RCN_PROC_NAME_SERVER "rcn_server"
 #define RCN_PROC_NAME_CLIENT "rcn_client"
 #define RCN_PROC_NAME_RELAY  "rcn_relay"
+
+#define RCN_CONN_TIMEOUT_MS 5000
 
 #endif // !RCN_H

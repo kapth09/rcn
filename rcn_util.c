@@ -29,7 +29,7 @@ int u_close_connection(int fd) {
     return 0;
 err:
     close(fd);
-    ERR_LOG("c_close_connection");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -45,7 +45,7 @@ static int resize(void** data, size_t elm_size, size_t* capacity,size_t extra_el
     printf("resize\n");
     return 0;
 err:
-    ERR_LOG("u_array_resize");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -57,7 +57,7 @@ struct u_array u_array_create(size_t size, size_t capacity) {
     arr.data = TRY(calloc(capacity, size), NULL);
     return arr;
 err:
-    ERR_LOG("u_array_create");
+    DEBUG_LOG("");
     return (struct u_array){.data = NULL};
 }
 
@@ -71,7 +71,7 @@ int u_array_init(struct u_array* arr, size_t size, size_t capacity) {
     CHECK(arr->data == NULL);
     return 0;
 err:
-    ERR_LOG("u_array_init");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -79,7 +79,7 @@ int u_array_resize(struct u_array* arr, size_t extra_elements) {
     CHECK(resize(&arr->data, arr->size, &arr->capacity, extra_elements) == -1);
     return 0;
 err:
-    ERR_LOG("u_array_resize");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -93,7 +93,7 @@ int u_array_add(struct u_array* arr, void* data) {
     arr->length++;
     return 0;
 err:
-    ERR_LOG("u_array_add");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -108,7 +108,7 @@ int u_array_set(struct u_array* arr, void* data, size_t i) {
         arr->length = i + 1;
     return 0;
 err:
-    ERR_LOG("u_array_set");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -119,7 +119,7 @@ int u_array_delete(struct u_array* arr) {
     arr->length--;
     return 0;
 err:
-    ERR_LOG("u_array_delete");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -135,7 +135,7 @@ int u_array_remove(struct u_array* arr, size_t i) {
     arr->length--;
     return 0;
 err:
-    ERR_LOG("u_array_remove");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -152,7 +152,7 @@ int u_array_remove_get(struct u_array* arr, void* element, size_t i) {
     arr->length--;
     return 0;
 err:
-    ERR_LOG("u_array_remove_get");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -163,7 +163,7 @@ int u_array_getr(struct u_array* arr, void** element, size_t i) {
     *element = arr->data + (arr->size * i);
     return 0;
 err:
-    ERR_LOG("u_array_getr");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -175,7 +175,7 @@ int u_array_getv(struct u_array* arr, void* element, size_t i) {
     memcpy(element, offset, arr->size);
     return 0;
 err:
-    ERR_LOG("u_array_getv");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -187,10 +187,10 @@ ssize_t u_array_find_index(struct u_array* arr, void* element) {
         if (memcmp(offset, element, arr->size) == 0)
             return (ssize_t)i;
     }
-    ERR_LOG("u_array_find_index");
+    DEBUG_LOG("");
     return -1;
 err:
-    ERR_LOG("u_array_find_index");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -199,7 +199,7 @@ int u_array_free(struct u_array* arr) {
     u_safe_free(&arr->data);
     return 0;
 err:
-    ERR_LOG("u_array_free");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -209,7 +209,7 @@ int u_queue_init(struct u_queue* queue, size_t size, size_t capacity) {
     queue->is_empty = true;
     return 0;
 err:
-    ERR_LOG("u_queue_init");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -218,7 +218,7 @@ int u_queue_push(struct u_queue* queue, void* element) {
     queue->is_empty = false;
     return 0;
 err:
-    ERR_LOG("u_queue_push");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -227,7 +227,7 @@ int u_queue_peek(struct u_queue* queue, void** element) {
     CHECK(u_array_getr(&queue->data_array, element, 0) == -1);
     return 0;
 err:
-    ERR_LOG("u_queue_peek");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -237,7 +237,7 @@ int u_queue_pop(struct u_queue* queue, void* element) {
     queue->is_empty = queue->data_array.length == 0;
     return 0;
 err:
-    ERR_LOG("u_queue_pop");
+    DEBUG_LOG("");
     return -1;
 }
 
@@ -246,6 +246,6 @@ int u_queue_free(struct u_queue* queue) {
     u_safe_free(&queue->data_array.data);
     return 0;
 err:
-    ERR_LOG("u_queue_free");
+    DEBUG_LOG("");
     return -1;
 }
