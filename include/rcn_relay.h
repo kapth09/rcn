@@ -1,9 +1,12 @@
 #ifndef RCN_RCN_RELAY_H
 #define RCN_RCN_RELAY_H
 
+#include <linux/uinput.h>
+
 #define DEFAULT_USOCK_COUNT 3
 #define RELAY_SLEEP_TIMEOUT 5
 
+/* forward declarations */
 struct d_context;
 
 enum relay_msg_header {
@@ -13,11 +16,18 @@ enum relay_msg_header {
     RELAY_HEADER_PAUSE_AGAIN,
     RELAY_HEADER_RESUME,
     RELAY_HEADER_RESUME_AGAIN,
+    RELAY_HEADER_NO_PEER,
     RELAY_HEADER_STOP,
+    RELAY_HEADER_LIST,
 };
 
 struct relay_msg {
     enum relay_msg_header header;
+};
+
+struct relay_data_list {
+    char dev_name[UINPUT_MAX_NAME_SIZE];
+    bool grabbed;
 };
 
 struct relay_arg {

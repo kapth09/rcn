@@ -58,6 +58,7 @@ int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const cha
     CHECK(u_array_add(&devices->r, tmp_dev) == -1);
     u_safe_free((void**)&tmp_dev);
     CHECK(u_array_getr(&devices->r, (void**)out_dev, devices->r.length-1) == -1);
+    LOG("init device '%s' (%s)", (*out_dev)->info.name, dev_path);
     return 0;
 err:
     *out_dev = NULL;
@@ -109,6 +110,13 @@ err:
 int dev_grab_device_by_ptr(struct device* dev, enum device_ctrl ctrl) {
     CHECK(drain_events(dev) == -1);
     CHECK(ioctl(dev->stream->fd, EVIOCGRAB, ctrl == DEV_CTRL_CAPTURE) == -1);
+    if (ctrl == DEV_CTRL_CAPTURE) {
+        dev->grabbed = true;
+        LOG("grabbed device '%s'", dev->info.name);
+    } else if (ctrl == DEV_CTRL_RELEASE) {
+        dev->grabbed = false;
+        LOG("ungrabbed device '%s'", dev->info.name);
+    }
     return 0;
 err:
     DEBUG_LOG("");
@@ -175,7 +183,7 @@ static int apply_udev_info(int u_fd, struct device* device, struct device_info* 
     struct uinput_setup setup = {};
     setup.id = template->dev_id;
     char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
-    snprintf(tmp_buff, sizeof(tmp_buff), "RCN-VIRT-%s", template->name);
+    snprintf(tmp_buff, sizeof(tmp_buff), "[RCN-VIRT] %s", template->name);
     strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     strncpy(template->name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     memcpy(&device->info, template, sizeof(struct device_info));
@@ -194,6 +202,7 @@ int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct devi
     CHECK(apply_udev_info(u_fd, device, template) == -1);
     CHECK(e_epoll_add_device(ep_ctx, u_fd, device, FD_UDEV) == -1);
     CHECK(u_array_add(&devices->r, device) == -1);
+    LOG("recreated device '%s'", template->name);
     return 0;
 err:
     if (u_fd != -1)

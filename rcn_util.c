@@ -49,18 +49,6 @@ err:
     return -1;
 }
 
-struct u_array u_array_create(size_t size, size_t capacity) {
-    struct u_array arr = {};
-    arr.length = 0;
-    arr.capacity = capacity;
-    arr.size = size;
-    arr.data = TRY(calloc(capacity, size), NULL);
-    return arr;
-err:
-    DEBUG_LOG("");
-    return (struct u_array){.data = NULL};
-}
-
 int u_array_init(struct u_array* arr, size_t size, size_t capacity) {
     CHECK(size <= 0);
     CHECK(capacity <= 0);

@@ -9,6 +9,8 @@ static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_RESUME] = ARG_SUBACTION_RESUME,
     [SUBACTION_STOP] = ARG_SUBACTION_STOP,
     [SUBACTION_LOG] = ARG_SUBACTION_LOG,
+    [SUBACTION_LIST] = ARG_SUBACTION_LIST,
+    [SUBACTION_LS] = ARG_SUBACTION_LS,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
 
@@ -20,6 +22,9 @@ static const struct arg_help_data help_data[] = {
     {ARG_SUBACTION_PAUSE, ARG_HELP_SUBACTION_PAUSE},
     {ARG_SUBACTION_RESUME, ARG_HELP_SUBACTION_RESUME},
     {ARG_SUBACTION_STOP, ARG_HELP_SUBACTION_STOP},
+    {ARG_SUBACTION_LOG, ARG_HELP_SUBACTION_LOG},
+    {ARG_SUBACTION_LIST, ARG_HELP_SUBACTION_LIST},
+    {ARG_SUBACTION_LS, ARG_HELP_SUBACTION_LIST},
 };
 static const int help_data_length = sizeof(help_data) / sizeof(help_data[0]);
 
@@ -33,6 +38,7 @@ static const struct arg_handler handlers[] = {
     {ARG_SUBACTION_RESUME, ARG_SUBACTION_RESUME, arg_daemon},
     {ARG_SUBACTION_STOP, ARG_SUBACTION_STOP, arg_daemon},
     {ARG_SUBACTION_LOG, ARG_SUBACTION_LOG, arg_daemon},
+    {ARG_SUBACTION_LS, ARG_SUBACTION_LIST, arg_daemon},
 };
 static const int handlers_length = sizeof(handlers) / sizeof(handlers[0]);
 
@@ -50,6 +56,7 @@ static void print_help() {
     printf("\n\t%s: %s\n", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
     printf("\n\t%s: %s\n", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
     printf("\n\t%s: %s\n", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
+    printf("\n\t%s: %s\n", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
     printf("\n");
 
     printf("Possible flags are:\n");
@@ -78,7 +85,9 @@ static int handle_arg(int argc, char** argv, int* i, struct arg_context* arg_ctx
     bool found_handler = false;
     char* arg = argv[*i];
     for (int fi = 0; fi < handlers_length; fi++) {
-        if (strcmp(handlers[fi].flag, arg) == 0 || strcmp(handlers[fi].flag_long, arg) == 0) {
+        char* flag = handlers[fi].flag;
+        char* flag_long = handlers[fi].flag_long;
+        if (strcmp(flag, arg) == 0 || strcmp(flag_long, arg) == 0) {
             found_handler = true;
             CHECK(handlers[fi].handler(argc, argv, i, arg_ctx) == -1);
         }
@@ -245,6 +254,8 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_PAUSE: return RELAY_HEADER_PAUSE;
         case SUBACTION_RESUME: return RELAY_HEADER_RESUME;
         case SUBACTION_STOP: return RELAY_HEADER_STOP;
+        case SUBACTION_LIST: return RELAY_HEADER_LIST;
+        case SUBACTION_LS: return RELAY_HEADER_LIST;
         default:
             DEBUG_LOG("");
             return -1;

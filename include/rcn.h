@@ -7,6 +7,8 @@
 
 extern enum debug_level g_debug_level;
 
+#define LOG(fmt, ...) fprintf(stdout, "rcn: " fmt "\n", ##__VA_ARGS__)
+
 #define ERR_GOTO(label, ...) 					\
     do { 							            \
 	fprintf(stderr, __VA_ARGS__); 				\
@@ -61,10 +63,10 @@ extern enum debug_level g_debug_level;
 #define RCN_DAEMON_DIR_PATH "/tmp/rcn/"
 #define RCN_SERVER_LOG_PATH RCN_DAEMON_DIR_PATH "server.log"
 #define RCN_CLIENT_LOG_PATH RCN_DAEMON_DIR_PATH "client.log"
-#define RCN_SERVER_SOCKET_PATH RCN_DAEMON_DIR_PATH "server.sock"
-#define RCN_SERVER_SOCKET_LEN sizeof(RCN_SERVER_SOCKET_PATH)
-#define RCN_CLIENT_SOCKET_PATH RCN_DAEMON_DIR_PATH "client.sock"
-#define RCN_CLIENT_SOCKET_LEN sizeof(RCN_CLIENT_SOCKET_PATH)
+#define RCN_SERVER_USOCKET_PATH RCN_DAEMON_DIR_PATH "server.sock"
+#define RCN_SERVER_USOCKET_LEN sizeof(RCN_SERVER_USOCKET_PATH)
+#define RCN_CLIENT_USOCKET_PATH RCN_DAEMON_DIR_PATH "client.sock"
+#define RCN_CLIENT_USOCKET_LEN sizeof(RCN_CLIENT_USOCKET_PATH)
 #define RCN_STD_CAPACITY 10
 #define RCN_DEV_MAX_NAME_LEN 255
 

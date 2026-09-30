@@ -31,6 +31,7 @@ static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     CHECK(e_epoll_add_getr(ep_ctx, sock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
     p_ctx->peer_state = PEER_CONNECTED;
+    LOG("accepted peer over isock");
     return 0;
 err:
     DEBUG_LOG("");
@@ -46,6 +47,7 @@ static int accept_usock(struct epoll_context* ep_ctx, epoll_stream_arr* relay_st
     struct epoll_stream* relay_stream;
     CHECK(e_epoll_add_getr(ep_ctx, sock_fd, FD_RELAY, &relay_stream) == -1);
     CHECK(u_array_add(&relay_streams->r, &relay_stream) == -1);
+    LOG("accepted relay over usock");
     return 0;
 err:
     DEBUG_LOG("");
@@ -135,6 +137,7 @@ static int init_peer_sock(const int port, const char *host) {
     CHECK(connected == false);
     int fd_flags = TRY(fcntl(isock_fd, F_GETFL, 0), 1);
     CHECK(fcntl(isock_fd, F_SETFL, O_NONBLOCK | fd_flags) == -1);
+    LOG("connected to server %s", host);
     return isock_fd;
 err:
     ERR_LOG("");
@@ -151,6 +154,7 @@ static int init_inet_sock(const int port) {
     s_iaddr.sin_addr.s_addr = INADDR_ANY;
     CHECK(bind(isock_fd, (struct sockaddr*)&s_iaddr, sizeof(s_iaddr)) == -1);
     CHECK(listen(isock_fd, 0) == -1);
+    LOG("listening on port %d", port);
     return isock_fd;
 err:
     DEBUG_LOG("");
@@ -247,12 +251,13 @@ err:
     return -1;
 }
 
-static int cleanup(struct d_context* d_ctx) {
+static int cleanup(struct d_context* d_ctx, char* usock_path) {
     struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     CHECK(r_close_relay_ctx(ep_ctx, d_ctx->relay_ctx) == -1);
     CHECK(p_close_peer_ctx(ep_ctx, d_ctx->peer_ctx) == -1);
     CHECK(dev_close_device_ctx(ep_ctx, d_ctx->device_ctx) == -1);
     CHECK(e_close_epoll_ctx(ep_ctx) == -1); // close epoll_ctx last, as other ctx depend on its FD
+    CHECK(unlink(usock_path) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -296,16 +301,16 @@ static int d_init(struct daemon_arg arg) {
 
     CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
 
-    char* sock_path;
+    char* usock_path;
     size_t sock_len;
     if (arg.type == DAEMON_SERVER) {
-        sock_path = RCN_SERVER_SOCKET_PATH;
-        sock_len = RCN_SERVER_SOCKET_LEN;
+        usock_path = RCN_SERVER_USOCKET_PATH;
+        sock_len = RCN_SERVER_USOCKET_LEN;
     } else {
-        sock_path = RCN_CLIENT_SOCKET_PATH;
-        sock_len = RCN_CLIENT_SOCKET_LEN;
+        usock_path = RCN_CLIENT_USOCKET_PATH;
+        sock_len = RCN_CLIENT_USOCKET_LEN;
     }
-    const int usock_fd = TRY(r_init_usock(sock_path, sock_len), -1);
+    const int usock_fd = TRY(r_init_usock(usock_path, sock_len), -1);
     CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
 
     int net_fd = 0;
@@ -320,7 +325,7 @@ static int d_init(struct daemon_arg arg) {
     int64_t status_success = DAEMON_STATUS_OK;
     CHECK(write(arg.evtfd, &status_success, sizeof(status_success)) == -1);
     CHECK(d_loop(&d_ctx) == -1);
-    CHECK(cleanup(&d_ctx) == -1);
+    CHECK(cleanup(&d_ctx, usock_path) == -1);
     return 0;
 err:
     int64_t status_err = errno;

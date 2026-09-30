@@ -10,6 +10,8 @@
 #define ARG_SUBACTION_RESUME 	"resume"
 #define ARG_SUBACTION_STOP 	    "stop"
 #define ARG_SUBACTION_LOG       "log"
+#define ARG_SUBACTION_LIST      "list"
+#define ARG_SUBACTION_LS        "ls"
 
 #define ARG_DESC_ACTION_START       "Start the server, on the given port, in the background"
 #define ARG_DESC_ACTION_CONNECT     "Connect to the given server and capture the list of devices"
@@ -20,6 +22,7 @@
 #define ARG_DESC_SUBACTION_RESUME  "Resume the capturing of the devices"
 #define ARG_DESC_SUBACTION_STOP    "Stop the program"
 #define ARG_DESC_SUBACTION_LOG     "Print the logs to stdout"
+#define ARG_DESC_SUBACTION_LIST    "List captured devices"
 
 #define ARG_FLAG_PORT 	        "-p"
 #define ARG_FLAG_LONG_PORT      "--port"
@@ -56,12 +59,17 @@
                                     "The server keeps running and new clients can connect.\n\t" \
                                     "If 'action' is set to 'server', the server closes the connection, deletes the copied devices and the background process is stopped.\n\t" \
                                     "No clients can connect anymore (unless started again)."
+#define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
+                                    "If --debug is set, more info is available."
+#define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not."
 
 enum subaction_type {
     SUBACTION_PAUSE,
     SUBACTION_RESUME,
     SUBACTION_STOP,
     SUBACTION_LOG,
+    SUBACTION_LIST,
+    SUBACTION_LS,
     SUBACTION_COUNT,
 };
 

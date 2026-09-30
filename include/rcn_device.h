@@ -35,6 +35,7 @@ struct device_info {
 struct device {
     struct device_info info;
     struct epoll_stream* stream;
+    bool grabbed;
 };
 
 struct device_context {

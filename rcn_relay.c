@@ -6,6 +6,8 @@
 #include "include/rcn_stream.h"
 #include "include/rcn_types.h"
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
@@ -25,15 +27,16 @@ static const char* relay_text[] = {
     [RELAY_HEADER_RESUME] = "resumed",
     [RELAY_HEADER_RESUME_AGAIN] = "already resumed",
     [RELAY_HEADER_STOP] = "stopped",
+    [RELAY_HEADER_NO_PEER] = "no peer connected",
 };
 
 static int init_sockinfo(enum daemon_type d_type, struct sock_info* info) {
     if (d_type == DAEMON_SERVER) {
-        info->sock_path = RCN_SERVER_SOCKET_PATH;
-        info->path_len = RCN_SERVER_SOCKET_LEN;
+        info->sock_path = RCN_SERVER_USOCKET_PATH;
+        info->path_len = RCN_SERVER_USOCKET_LEN;
     } else if (d_type == DAEMON_CLIENT) {
-        info->sock_path = RCN_CLIENT_SOCKET_PATH;
-        info->path_len = RCN_CLIENT_SOCKET_LEN;
+        info->sock_path = RCN_CLIENT_USOCKET_PATH;
+        info->path_len = RCN_CLIENT_USOCKET_LEN;
     } else {
         goto err;
     }
@@ -52,6 +55,7 @@ int r_init_usock(char* sock_path, size_t path_len) {
     memcpy(d_uaddr.sun_path, sock_path, path_len);
     CHECK(bind(d_usock_fd, (struct sockaddr*)&d_uaddr, sizeof(d_uaddr)) == -1);
     CHECK(listen(d_usock_fd, DEFAULT_USOCK_COUNT) == -1);
+    LOG("created unix socket");
     return d_usock_fd;
 err:
     DEBUG_LOG("");
@@ -82,16 +86,6 @@ err:
     return -1;
 }
 
-void tstp_handler(int sig) {
-    (void)sig;
-    fprintf(stderr, "\rerr: cannot start daemon, see log for more info\n");
-    exit(-1);
-}
-
-void cont_handler(int sig) {
-    (void)sig;
-}
-
 static int check_daemon_status(int eventfd) {
     printf("...");
     fflush(stdout);
@@ -106,6 +100,45 @@ err:
     return -1;
 }
 
+static int handle_request(struct stream_item* item) {
+    enum relay_msg_header header = item->payload.msg.header.value;
+    switch (header) {
+        case RELAY_HEADER_START:
+        case RELAY_HEADER_PAUSE:
+        case RELAY_HEADER_PAUSE_AGAIN:
+        case RELAY_HEADER_RESUME:
+        case RELAY_HEADER_RESUME_AGAIN:
+        case RELAY_HEADER_NO_PEER:
+        case RELAY_HEADER_STOP: printf("\rrcn: %s\n", relay_text[header]); break;
+        case RELAY_HEADER_LIST: {
+            if (item->payload.msg.header.size == 0) {
+                printf("rcn: no devices captured\n");
+                break;
+            }
+            relay_devices_list list = {};
+            list.r.size = sizeof(struct relay_data_list);
+            list.r.length = item->payload.msg.header.size / list.r.size;
+            list.r.data = item->payload.msg.buffer;
+            list.r.capacity = list.r.size * list.r.length;
+            for (size_t i = 0; i < list.r.length; i++) {
+                struct relay_data_list* list_entry = {};
+                CHECK(u_array_getr(&list.r, (void**)&list_entry, i++) == -1);
+                printf("%s ", list_entry->dev_name);
+                if (list_entry->grabbed)
+                    printf("[grabbed]\n");
+                else
+                    printf("[ungrabbed]\n");
+            }
+            break;
+        }
+        default: goto err;
+    }
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
 int relay_start(struct relay_arg arg) {
     if (arg.check_daemon_status == true)
         CHECK(check_daemon_status(arg.evtfd) == -1);
@@ -113,19 +146,32 @@ int relay_start(struct relay_arg arg) {
     struct sock_info info = {};
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
     int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);
+    struct stream_header request = {};
+    request.size = 0;
+    request.value = arg.header_sent;
+    CHECK(write(usock_fd, &request, sizeof(request)) == -1);
+    CHECK(fcntl(usock_fd, F_SETFL, O_NONBLOCK) == -1);
+    struct epoll_stream stream = {};
+    CHECK(stream_init(&stream, usock_fd, FD_RELAY) == -1);
+    struct pollfd fds = {};
+    fds.fd = usock_fd;
+    fds.events = POLLIN;
     printf("\rrcn>");
     fflush(stdout);
-    struct stream_header msg = {};
-    msg = (struct stream_header){ .value = arg.header_sent, .size = 0 };
-    CHECK(write(usock_fd, &msg, sizeof(msg)) == -1);
-    // blocking read on socket to wait for daemon
-    CHECK(read(usock_fd, &msg, sizeof(msg)) == -1);
-    CHECK(u_close_connection(usock_fd) == -1);
-    printf("\rrcn: %s\n", relay_text[msg.value]);
+    for (;;) {
+        CHECK(poll(&fds, 1, -1) == -1);
+        CHECK(stream_stream(&stream) == -1);
+        struct stream_item* item = stream.next;
+        CHECK(item->state == STREAM_STREAMING_CLOSED);
+        if (item->state != STREAM_STREAMING_COMPLETE)
+            continue;
+        CHECK(stream_collect(&stream, &item) == -1);
+        CHECK(handle_request(item) == -1);
+        break;
+    }
+    CHECK(stream_shutdown(&stream) == -1);
     return 0;
 err:
-    fflush(stderr);
-    fprintf(stderr, "\r");
     DEBUG_LOG("");
     return -1;
 }
@@ -133,6 +179,15 @@ err:
 int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream) {
     size_t index = TRY(u_array_find_index(&r_ctx->relay_streams.r, &stream), -1);
     CHECK(u_array_remove(&r_ctx->relay_streams.r, index) == -1);
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
+static int handler_idle(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)stream_item;
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_IDLE, 0, NULL) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -159,9 +214,13 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     else if (d_ctx->type == DAEMON_SERVER)
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-    CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
-    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
-    d_ctx->state = RCN_PAUSED;
+    if (d_ctx->peer_ctx->peer_state == PEER_CONNECTED) {
+        CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
+        d_ctx->state = RCN_PAUSED;
+    } else {
+        CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_NO_PEER) == -1);
+    }
     return 0;
 err:
     DEBUG_LOG("");
@@ -187,9 +246,8 @@ err:
 }
 
 static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
     (void)stream_item;
+    (void)stream;
     d_ctx->exit = true;
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
@@ -200,10 +258,36 @@ err:
     return -1;
 }
 
+static int handler_list(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)stream_item;
+    relay_devices_list list = {};
+    device_arr* devices = &d_ctx->device_ctx->devices;
+    if (devices->r.length == 0)
+        goto send;
+    CHECK(u_array_init(&list.r, sizeof(struct relay_data_list), devices->r.length) == -1);
+    for (size_t i = 0; i < devices->r.length; i++) {
+        printf("getting dev info for list\n");
+        struct device* device = {};
+        CHECK(u_array_getr(&devices->r, (void**)&device, i) == -1);
+        struct relay_data_list list_entry = {};
+        list_entry.grabbed = device->grabbed;
+        memcpy(list_entry.dev_name, device->info.name, UINPUT_MAX_NAME_SIZE);
+        CHECK(u_array_add(&list.r, &list_entry) == -1);
+    }
+send:
+    const size_t size = list.r.length * list.r.size;
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_LIST, size, list.r.data) == -1);
+    CHECK(u_array_free(&list.r) == -1);
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     switch (stream_item->payload.msg.header.value) {
         case RELAY_HEADER_IDLE: {
-            /* do nothing, relay hangs on blocking read() */
+            // CHECK(handler_idle(d_ctx, stream, stream_item) == -1);
             break;
         }
         case RELAY_HEADER_START: {
@@ -220,6 +304,10 @@ int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
         }
         case RELAY_HEADER_STOP: {
             CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case RELAY_HEADER_LIST: {
+            CHECK(handler_list(d_ctx, stream, stream_item) == -1);
             break;
         }
         default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->payload.msg.header.value);
