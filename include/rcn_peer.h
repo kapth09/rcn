@@ -8,6 +8,7 @@ struct d_context;
 enum peer_msg_header {
     PEER_HEADER_DEV_CRT,
     PEER_HEADER_DEV_DEL,
+    PEER_HEADER_DEV_UPD_GRAB,
     PEER_HEADER_EVENT,
     PEER_HEADER_PAUSE,
     PEER_HEADER_RESUME,
@@ -20,6 +21,11 @@ struct peer_msg_dev_crt {
 
 struct peer_msg_dev_del {
     size_t random_id;
+};
+
+struct peer_msg_dev_upd_grab {
+    size_t random_id;
+    bool grab;
 };
 
 struct peer_msg_event {

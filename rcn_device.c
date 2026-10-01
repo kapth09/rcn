@@ -70,7 +70,7 @@ int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum dae
     CHECK(u_array_init(&d_ctx->device_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
     if (type == DAEMON_CLIENT) {
         CHECK(dev_init_devices_arg(d_ctx->ep_ctx, d_ctx->device_ctx, d_ctx->peer_ctx, devices_arg) == -1);
-        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
+        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, d_ctx->peer_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
         CHECK(u_array_free(&devices_arg->r) == -1);
     }
     return 0;
@@ -107,7 +107,7 @@ err:
     return -1;
 }
 
-int dev_grab_device_by_ptr(struct device* dev, enum device_ctrl ctrl) {
+int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl) {
     CHECK(drain_events(dev) == -1);
     CHECK(ioctl(dev->stream->fd, EVIOCGRAB, ctrl == DEV_CTRL_CAPTURE) == -1);
     if (ctrl == DEV_CTRL_CAPTURE) {
@@ -117,6 +117,11 @@ int dev_grab_device_by_ptr(struct device* dev, enum device_ctrl ctrl) {
         dev->grabbed = false;
         LOG("ungrabbed device '%s'", dev->info.name);
     }
+    struct peer_msg_dev_upd_grab msg = {};
+    msg.random_id = dev->info.random_id;
+    msg.grab = dev->grabbed;
+    size_t size = sizeof(struct peer_msg_dev_upd_grab);
+    CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_UPD_GRAB, size, &msg) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -183,7 +188,7 @@ static int apply_udev_info(int u_fd, struct device* device, struct device_info* 
     struct uinput_setup setup = {};
     setup.id = template->dev_id;
     char tmp_buff[UINPUT_MAX_NAME_SIZE*2];
-    snprintf(tmp_buff, sizeof(tmp_buff), "[RCN-VIRT] %s", template->name);
+    snprintf(tmp_buff, sizeof(tmp_buff), "(rcn-virt) %s", template->name);
     strncpy(setup.name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     strncpy(template->name, tmp_buff, UINPUT_MAX_NAME_SIZE);
     memcpy(&device->info, template, sizeof(struct device_info));
@@ -211,14 +216,22 @@ err:
     return -1;
 }
 
-int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event) {
-    struct device *dev = NULL;
-    device_arr* devices = &d_ctx->device_ctx->devices;
+int dev_find_by_id(device_arr* devices, size_t random_id, struct device** out_dev) {
     for (size_t i = 0; i < devices->r.length; i++) {
-        CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
-        if (dev->info.random_id == event.random_id)
+        CHECK(u_array_getr(&devices->r, (void**)out_dev, i) == -1);
+        if ((*out_dev)->info.random_id == random_id)
             break;
     }
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
+int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event) {
+    device_arr* devices = &d_ctx->device_ctx->devices;
+    struct device *dev = NULL;
+    CHECK(dev_find_by_id(devices, event.random_id, &dev) == -1);
     CHECK(dev == NULL);
     CHECK(stream_queue_writing_device(d_ctx->ep_ctx, dev->stream, event.evt_data) == -1);
     if (event.evt_data.type == EV_REL) {
@@ -277,11 +290,11 @@ err:
     return -1;
 }
 
-int dev_ctrl_devices(struct epoll_context* ep_ctx, device_arr* devices, enum device_ctrl ctrl) {
+int dev_ctrl_devices(struct epoll_context* ep_ctx, struct peer_context* p_ctx, device_arr* devices, enum device_ctrl ctrl) {
     for (size_t i = 0; i < devices->r.length; i++) {
         struct device* dev = {};
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
-        CHECK(dev_grab_device_by_ptr(dev, ctrl) == -1);
+        CHECK(dev_grab_device_by_ptr(ep_ctx, p_ctx, dev, ctrl) == -1);
         struct epoll_event ep_evt = {};
         ep_evt.events = dev->stream->fd_type == FD_DEV ? EPOLLIN : EPOLLOUT;
         ep_evt.data.ptr = dev->stream;

@@ -1,15 +1,16 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g -std=gnu2x
+CFLAGS = -Wall -Wextra -std=gnu2x
 SRCS = ./rcn.c ./rcn_daemon.c ./rcn_epoll.c ./rcn_relay.c ./rcn_util.c ./rcn_arg.c ./rcn_device.c ./rcn_peer.c ./rcn_stream.c
 TARGET = rcn
 
-all:
+default: CFLAGS += -g
+default:
 	$(CC) $(SRCS) $(CFLAGS) -o $(TARGET)
 
-debug:
+normal:
 	$(CC) $(SRCS) $(CFLAGS) -o $(TARGET)
 
 clean:
 	rm -f $(TARGET)
 
-.PHONY: all debug clean
+.PHONY: default clean

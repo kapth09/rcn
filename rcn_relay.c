@@ -123,7 +123,7 @@ static int handle_request(struct stream_item* item) {
             for (size_t i = 0; i < list.r.length; i++) {
                 struct relay_data_list* list_entry = {};
                 CHECK(u_array_getr(&list.r, (void**)&list_entry, i++) == -1);
-                printf("%s ", list_entry->dev_name);
+                printf("\rrcn> %s ", list_entry->dev_name);
                 if (list_entry->grabbed)
                     printf("[grabbed]\n");
                 else
@@ -185,15 +185,6 @@ err:
     return -1;
 }
 
-static int handler_idle(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)stream_item;
-    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_IDLE, 0, NULL) == -1);
-    return 0;
-err:
-    DEBUG_LOG("");
-    return -1;
-}
-
 static int handler_start(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_START, 0, NULL) == -1);
@@ -210,7 +201,7 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
         return 0;
     }
     if (d_ctx->type == DAEMON_CLIENT)
-        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_RELEASE) == -1);
+        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, d_ctx->peer_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_RELEASE) == -1);
     else if (d_ctx->type == DAEMON_SERVER)
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
@@ -234,7 +225,7 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
         return 0;
     }
     if (d_ctx->type == DAEMON_CLIENT)
-        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
+        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, d_ctx->peer_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
     else if (d_ctx->type == DAEMON_SERVER)
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_RESUME, 0, NULL) == -1);
@@ -266,7 +257,6 @@ static int handler_list(struct d_context* d_ctx, struct epoll_stream* stream, st
         goto send;
     CHECK(u_array_init(&list.r, sizeof(struct relay_data_list), devices->r.length) == -1);
     for (size_t i = 0; i < devices->r.length; i++) {
-        printf("getting dev info for list\n");
         struct device* device = {};
         CHECK(u_array_getr(&devices->r, (void**)&device, i) == -1);
         struct relay_data_list list_entry = {};

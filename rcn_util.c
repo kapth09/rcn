@@ -42,7 +42,6 @@ static int resize(void** data, size_t elm_size, size_t* capacity,size_t extra_el
     CHECK(tmp == NULL);
     *data = tmp;
     *capacity += extra_elements;
-    printf("resize\n");
     return 0;
 err:
     DEBUG_LOG("");
