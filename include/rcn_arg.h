@@ -137,8 +137,18 @@ struct arg_help_data {
     goto err;                                                               \
 })
 
-#define EARG_AGAIN(flag) ({                                            \
+#define EARG_WRONG_SUBACTION(flag) ({                                            \
+    fprintf(stderr, "err: invalid subaction '%s'\n", flag);                      \
+    goto err;                                                                    \
+})
+
+#define EARG_FLAG_AGAIN(flag) ({                                            \
     fprintf(stderr, "err: flag '%s' already used\n", flag);            \
+    goto err;                                                          \
+})
+
+#define EARG_SUBACTION_AGAIN(flag) ({                                            \
+    fprintf(stderr, "err: subaction '%s' already used\n", flag);            \
     goto err;                                                          \
 })
 

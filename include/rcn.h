@@ -52,11 +52,13 @@ extern enum debug_level g_debug_level;
 #define CHECK(condition) 		    \
     do { 					        \
 	if ((condition)) goto err; 		\
+	errno = 0;						\
     } while(0)
 
 #define TRY(expr, err_val) ({            \
     __typeof__(expr) _ret = (expr);      \
     if (_ret == (err_val)) goto err;     \
+	errno = 0;	   						 \
     _ret;                                \
 })
 

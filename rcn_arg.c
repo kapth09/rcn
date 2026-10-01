@@ -124,7 +124,7 @@ int arg_port(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->port.info.needed == false)
         EARG_WRONG_FLAG(ARG_FLAG_PORT);
     if (ctx->port.info.provided == true)
-        EARG_AGAIN(ARG_FLAG_PORT);
+        EARG_FLAG_AGAIN(ARG_FLAG_PORT);
     int port = atoi(argv[++(*i)]);
     if (port == 0)
         EARG_INVALID(argv[*i], ARG_FLAG_PORT);
@@ -141,7 +141,7 @@ int arg_host(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->server.info.needed == false)
         EARG_WRONG_FLAG(ARG_FLAG_HOST);
     if (ctx->server.info.provided == true)
-        EARG_AGAIN(ARG_FLAG_HOST);
+        EARG_FLAG_AGAIN(ARG_FLAG_HOST);
     ctx->server.val.v_char = argv[++(*i)];
     ctx->server.info.provided = true;
     return 0;
@@ -155,7 +155,7 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->devices.info.needed == false)
         EARG_WRONG_FLAG(ARG_FLAG_DEVICES);
     if (ctx->devices.info.provided == true)
-        EARG_AGAIN(ARG_FLAG_DEVICES);
+        EARG_FLAG_AGAIN(ARG_FLAG_DEVICES);
     char_arr* dev_arr = &ctx->devices.val.v_char_arr;
     CHECK(u_array_init(&dev_arr->r, sizeof(char*), RCN_STD_CAPACITY) == -1);
     (*i)++;
@@ -179,15 +179,22 @@ err:
 
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->daemon.info.needed == false)
-        EARG_WRONG_FLAG(ARG_FLAG_DEVICES);
+        EARG_WRONG_SUBACTION(argv[*i]);
     if (ctx->daemon.info.provided == true)
-        EARG_AGAIN(ARG_FLAG_DEVICES);
+        EARG_SUBACTION_AGAIN(argv[*i]);
     for (; *i < argc; (*i)++) {
         const char* arg = argv[*i];
+        bool found_subaction = false;
         for (int j = 0; j < subactions_length; j++) {
             if (strcmp(arg, subactions[j]) == 0) {
                 ctx->daemon.val.saction = j;
+                found_subaction = true;
+                break;
             }
+        }
+        if (found_subaction == false) {
+            ERR_LOG("unkown subaction '%s'", arg);
+            goto err;
         }
     }
     ctx->daemon.info.provided = true;
@@ -201,7 +208,7 @@ int arg_help(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->help.info.needed == false)
         EARG_WRONG_FLAG(ARG_FLAG_HELP);
     if (ctx->help.info.provided == true)
-        EARG_AGAIN(ARG_FLAG_HELP);
+        EARG_FLAG_AGAIN(ARG_FLAG_HELP);
     if (argc == 2) {
         print_help();
         ctx->help.info.provided = true;
@@ -246,6 +253,7 @@ int parse_args(int argc, char** argv, int start_arg, struct arg_context* ctx) {
     CHECK(validate_arg_ctx(ctx) == -1);
     return 0;
 err:
+    DEBUG_LOG("");
     return -1;
 }
 

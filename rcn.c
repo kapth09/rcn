@@ -2,10 +2,45 @@
 #include "include/rcn_arg.h"
 #include "include/rcn_daemon.h"
 #include <string.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 enum debug_level g_debug_level = DEBUG_OFF;
 
 static struct arg_context arg_ctx = {};
+
+static int daemon_is_running(enum daemon_type d_type) {
+    DIR* proc_dir = TRY(opendir("/proc"), NULL);
+    char* proc_name = {};
+    if (d_type == DAEMON_SERVER)
+        proc_name = RCN_PROC_NAME_SERVER;
+    else if (d_type == DAEMON_CLIENT)
+        proc_name = RCN_PROC_NAME_CLIENT;
+    struct dirent* ent = {};
+    while ((ent = readdir(proc_dir)) != NULL) {
+        char path_buff[512] = {};
+        snprintf(path_buff, sizeof(path_buff), "/proc/%s/comm", ent->d_name);
+        int file = open(path_buff, O_RDONLY);
+        if (file == -1) {
+            if (errno == ENOENT || errno == ENOTDIR)
+                continue;
+            goto err;
+        }
+        char name_buff[128] = {};
+        const int length = TRY(read(file, name_buff, sizeof(name_buff)), -1);
+        name_buff[length-1] = '\0';   // remove '\n' from name
+        if (strcmp(name_buff, proc_name) == 0) {
+            close(file);
+            closedir(proc_dir);
+            return 0;
+        }
+    }
+    return -1;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
 
 static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type) {
     struct relay_arg r_arg = {};
@@ -96,6 +131,27 @@ err:
     return -1;
 }
 
+static int auto_subaction(int argc, char** argv) {
+    arg_ctx.daemon.info.needed = true;
+    CHECK(parse_args(argc, argv, 1, &arg_ctx) == -1);
+    enum daemon_type d_type = DAEMON_CLIENT;
+    if (daemon_is_running(DAEMON_CLIENT) == -1) {
+        d_type = DAEMON_SERVER;
+        if (daemon_is_running(DAEMON_SERVER) == -1) {
+            fprintf(stderr, "err: no daemon running\n");
+            goto err;
+        }
+    }
+    if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
+        CHECK(d_print_log(d_type) == -1);
+    else
+        CHECK(subaction_daemon(d_type, arg_ctx.daemon.val.saction) == -1);
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
 static int help(int argc, char** argv) {
     arg_ctx.help.info.needed = true;
     CHECK(parse_args(argc, argv, 1, &arg_ctx) == -1);
@@ -121,7 +177,7 @@ int main(int argc, char** argv) {
     else if (strcmp(action, ARG_ACTION_CLIENT) == 0)
         CHECK(action_client(argc, argv) == -1);
     else
-        CHECK(help(argc, argv) == -1);
+        CHECK(auto_subaction(argc, argv) == -1);
     return 0;
 err:
     fprintf(stderr, "see 'rcn -h' for help\n");
