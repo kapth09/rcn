@@ -61,7 +61,14 @@
                                     "No clients can connect anymore (unless started again)."
 #define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
                                     "If --debug is set, more info is available."
-#define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not."
+#define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not. 'list' and 'ls' are the equivalent."
+
+#define ARG_HELP_RCN_DESC   "rcn is a tool to send inputs from eventX files and replay them on the server via a uinput virtual device.\n\t" \
+                            "The server is started via 'start', the client connects via 'connect'\n\t" \
+                            "Both the server and client have subactions, see 'rcn -h' for more info.\n\t" \
+                            "If either 'server' or 'client' is specified when running a subaction, the subaction is sent to the corresponding daemon.\n\t" \
+                            "If not, a 'auto-subaction' is performed. It automactially checks which daemon is running and sends the subaction to it.\n\t" \
+                            "It both server and client are running on the same machine, it defaults to the client."
 
 enum subaction_type {
     SUBACTION_PAUSE,

@@ -176,6 +176,8 @@ int main(int argc, char** argv) {
         CHECK(action_server(argc, argv) == -1);
     else if (strcmp(action, ARG_ACTION_CLIENT) == 0)
         CHECK(action_client(argc, argv) == -1);
+    else if (strcmp(action, ARG_FLAG_HELP) == 0)
+        CHECK(help(argc, argv) == -1);
     else
         CHECK(auto_subaction(argc, argv) == -1);
     return 0;

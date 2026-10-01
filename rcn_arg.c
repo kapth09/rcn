@@ -44,41 +44,47 @@ static const int handlers_length = sizeof(handlers) / sizeof(handlers[0]);
 
 static void print_help() {
     printf("Usage: rcn <action> <flag> <value> ...\n\n");
+
+    printf("Description:");
+    printf("\n\t%s", ARG_HELP_RCN_DESC);
+    printf("\n\n");
+
     printf("Possible actions are:");
-    printf("\n\t%s: %s\n", ARG_ACTION_START, ARG_DESC_ACTION_START);
-    printf("\n\t%s: %s\n", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
-    printf("\n\t%s: %s\n", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
-    printf("\n\t%s: %s\n", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
-    printf("\n");
+    printf("\n\t%s: %s", ARG_ACTION_START, ARG_DESC_ACTION_START);
+    printf("\n\t%s: %s", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
+    printf("\n\t%s: %s", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
+    printf("\n\t%s: %s", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
+    printf("\n\n");
 
     printf("Possible subaction are:");
-    printf("\n\t%s: %s\n", ARG_SUBACTION_PAUSE, ARG_DESC_SUBACTION_PAUSE);
-    printf("\n\t%s: %s\n", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
-    printf("\n\t%s: %s\n", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
-    printf("\n\t%s: %s\n", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
-    printf("\n\t%s: %s\n", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
-    printf("\n");
+    printf("\n\t%s: %s", ARG_SUBACTION_PAUSE, ARG_DESC_SUBACTION_PAUSE);
+    printf("\n\t%s: %s", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
+    printf("\n\t%s: %s", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
+    printf("\n\t%s: %s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
+    printf("\n\t%s: %s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
+    printf("\n\n");
 
     printf("Possible flags are:\n");
     printf("\t%s/%s: %s\n", ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, ARG_DESC_FLAG_PORT);
     printf("\tAvailable for actions:\n");
-    printf("\t\t%s, %s\n", ARG_ACTION_START, ARG_ACTION_CONNECT);
+    printf("\t\t%s, %s", ARG_ACTION_START, ARG_ACTION_CONNECT);
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
     printf("\tAvailable for action:\n");
-    printf("\t\t%s\n", ARG_ACTION_CONNECT);
+    printf("\t\t%s", ARG_ACTION_CONNECT);
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
     printf("\tAvailable for action:\n");
-    printf("\t\t%s\n", ARG_ACTION_CONNECT);
+    printf("\t\t%s", ARG_ACTION_CONNECT);
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
     printf("\tPossible values are:\n");
-    printf("\t\t<(sub)action>\n");
+    printf("\t\t<(sub)action>");
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
     printf("\tAvailability:\n");
-    printf("\t\tAlways\n");
+    printf("\t\tAlways");
+    printf("\n");
 }
 
 static int handle_arg(int argc, char** argv, int* i, struct arg_context* arg_ctx) {
