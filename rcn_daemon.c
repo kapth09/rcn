@@ -283,6 +283,7 @@ static int d_init(struct daemon_arg arg) {
     }
     CHECK(d_init_dir() == -1);
     CHECK(d_init_log(arg.type) == -1);
+    CHECK(setsid() == -1);
 
     struct epoll_context ep_ctx = {};
     struct relay_context relay_ctx = {};

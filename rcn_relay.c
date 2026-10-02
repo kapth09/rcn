@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
@@ -146,7 +147,15 @@ err:
     return -1;
 }
 
+static void sig_sigint(int sig) {
+    (void)sig;
+    printf("\r");
+    LOG("got interrupted");
+    exit(0);
+}
+
 int relay_start(struct relay_arg arg) {
+    signal(SIGINT, sig_sigint);
     if (arg.check_daemon_status == true)
         CHECK(check_daemon_status(arg.evtfd) == -1);
     CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
