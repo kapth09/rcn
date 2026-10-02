@@ -7,7 +7,6 @@ struct d_context;
 
 enum peer_msg_header {
     PEER_HEADER_DEV_CRT,
-    PEER_HEADER_DEV_DEL,
     PEER_HEADER_DEV_UPD_GRAB,
     PEER_HEADER_EVENT,
     PEER_HEADER_PAUSE,

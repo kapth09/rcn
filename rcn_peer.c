@@ -17,17 +17,6 @@ err:
     return -1;
 }
 
-static int handler_dev_del(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    // TODO
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    return 0;
-//err:
-    DEBUG_LOG("");
-    return -1;
-}
-
 static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream;
     struct peer_msg_dev_upd_grab* msg = stream_item->payload.msg.buffer;
@@ -88,7 +77,8 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     (void)stream_item;
     printf("rcn: got PEER_HEADER_STOP\n");
     if (d_ctx->type == DAEMON_SERVER) {
-        // TODO: delete all udev
+        CHECK(dev_close_device_ctx(d_ctx->ep_ctx, d_ctx->device_ctx) == -1);
+        CHECK(dev_init_device_ctx(d_ctx, NULL, DAEMON_SERVER) == -1);
     } else if (d_ctx->type == DAEMON_CLIENT) {
         d_ctx->exit = true;
         epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
@@ -104,10 +94,6 @@ int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
     switch (stream_item->payload.msg.header.value) {
         case PEER_HEADER_DEV_CRT: {
             CHECK(handler_dev_crt(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_DEV_DEL: {
-            CHECK(handler_dev_del(d_ctx, stream, stream_item) == -1);
             break;
         }
         case PEER_HEADER_DEV_UPD_GRAB: {

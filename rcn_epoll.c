@@ -108,7 +108,9 @@ err:
 }
 
 int e_epoll_close_remove_simple(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL) == -1);
+    int res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL);
+    // Ignore already deleted FDs
+    CHECK(res == -1 && errno != ENOENT);
     size_t index = TRY(u_array_find_index(&ep_ctx->stream_ptrs.r, &stream), -1);
     CHECK(u_array_remove(&ep_ctx->stream_ptrs.r, index) == -1);
     CHECK(stream_close(stream) == -1);
