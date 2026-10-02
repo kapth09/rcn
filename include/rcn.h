@@ -11,34 +11,31 @@ extern enum debug_level g_debug_level;
 
 #define ERR_GOTO(label, ...) 					\
     do { 							            \
-	fprintf(stderr, __VA_ARGS__); 				\
-	goto label; 						        \
+		fprintf(stderr, __VA_ARGS__); 			\
+		goto label; 						    \
     } while (0)
 
 #define DO_GOTO(expr, label)                    \
     do {                                        \
-    (expr);                                     \
-    goto label;                                 \
+		(expr);                                 \
+		goto label;                             \
     } while (0)
 
-#define ERRNO_GOTO(label, msg) 					        \
-    do { 							                    \
-	fprintf(stderr, "%s: %s\n", msg, strerror(errno)); 	\
-	goto label; 						                \
+#define ERRNO_GOTO(label, msg) 								\
+    do { 													\
+		fprintf(stderr, "%s: %s\n", msg, strerror(errno)); 	\
+		goto label; 						                \
     } while (0)
 
 #define ERR_LOG(fmt, ...)										\
     do {                                                		\
         fprintf(stderr, "err: %s:%d", __func__, __LINE__);	    \
         if ((fmt)[0] != 0){										\
-        fprintf(stderr, " " fmt, ##__VA_ARGS__);       			\
+			fprintf(stderr, " " fmt, ##__VA_ARGS__);       		\
 		}														\
-		int tmp_errno = errno;									\
         if (errno != 0) {										\
-		  fprintf(stderr, " [%s]", strerror(errno));     		\
-		  errno = 0;											\
+		    fprintf(stderr, " [%s]", strerror(errno));     		\
 		}														\
-		errno = tmp_errno;										\
 		fprintf(stderr, "\n");									\
     } while (0)
 

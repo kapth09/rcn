@@ -40,12 +40,13 @@ enum peer_state {
 struct peer_context {
     struct epoll_stream* isock_stream;
     struct epoll_stream* peer_stream;
+    int isock_port;
     enum peer_state isock_state;
     enum peer_state peer_state;
 };
 
 int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
-int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type);
+int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, int port, enum daemon_type d_type);
 int p_close_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
 int p_close_peer(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
 

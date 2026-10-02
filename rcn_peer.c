@@ -13,7 +13,7 @@ static int handler_dev_crt(struct d_context* d_ctx, struct epoll_stream* stream,
     CHECK(dev_init_udev(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, new_dev) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -25,7 +25,7 @@ static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* st
     dev->grabbed = msg->grab;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -35,7 +35,7 @@ static int handler_event(struct d_context* d_ctx, struct epoll_stream* stream, s
     CHECK(dev_emit_event_msg(d_ctx, msg) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -52,7 +52,7 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     d_ctx->state = RCN_PAUSED;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
@@ -68,17 +68,19 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
     d_ctx->state = RCN_RUNNING;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
-    printf("rcn: got PEER_HEADER_STOP\n");
     if (d_ctx->type == DAEMON_SERVER) {
         CHECK(dev_close_device_ctx(d_ctx->ep_ctx, d_ctx->device_ctx) == -1);
         CHECK(dev_init_device_ctx(d_ctx, NULL, DAEMON_SERVER) == -1);
+        d_ctx->peer_ctx->isock_stream->fd = TRY(d_init_inet_sock(d_ctx->peer_ctx->isock_port), -1);
+        CHECK(p_init_peer_ctx(d_ctx->ep_ctx, d_ctx->peer_ctx, d_ctx->peer_ctx->isock_stream->fd, d_ctx->peer_ctx->isock_port, DAEMON_SERVER) == -1);
+        d_ctx->state = RCN_RUNNING;
     } else if (d_ctx->type == DAEMON_CLIENT) {
         d_ctx->exit = true;
         epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
@@ -86,7 +88,7 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -120,11 +122,12 @@ int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
-int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, enum daemon_type d_type) {
+int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, int port, enum daemon_type d_type) {
+    p_ctx->isock_port = port;
     if (d_type == DAEMON_SERVER) {
         p_ctx->peer_stream = NULL;
         CHECK(e_epoll_add_getr(ep_ctx, isock_fd, FD_ISOCK, &p_ctx->isock_stream) == -1);
@@ -138,22 +141,18 @@ int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, in
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
 int p_close_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
-    if (p_ctx->isock_stream != NULL && p_ctx->isock_state != PEER_DISCONNECTED) {
-        p_ctx->isock_state = PEER_DISCONNECTED;
-        CHECK(e_epoll_close_remove_simple(ep_ctx, p_ctx->isock_stream) == -1);
-    }
     if (p_ctx->peer_stream != NULL && p_ctx->peer_state != PEER_DISCONNECTED) {
         p_ctx->peer_state = PEER_DISCONNECTED;
         CHECK(e_epoll_close_remove_simple(ep_ctx, p_ctx->peer_stream) == -1);
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 

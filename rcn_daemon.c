@@ -17,24 +17,21 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx, const struct epoll_stream* stream) {
+static int accept_isock(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct epoll_stream* stream) {
     struct sockaddr_in p_iaddr = {};
     struct sockaddr* addr = (struct sockaddr*)&p_iaddr;
     socklen_t addr_len = sizeof(p_iaddr);
     int sock_fd = TRY(accept(stream->fd, addr, &addr_len), -1);
-    if (p_ctx->peer_state == PEER_CONNECTED) {
-        close(sock_fd);
-        return 0;
-    }
     const int no_delay = 1;
     CHECK(setsockopt(sock_fd, SOL_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay)) == -1);
     CHECK(fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1);
     CHECK(e_epoll_add_getr(ep_ctx, sock_fd, FD_PEER, &p_ctx->peer_stream) == -1);
+    CHECK(e_epoll_close_remove_simple(ep_ctx, stream) == -1);
     p_ctx->peer_state = PEER_CONNECTED;
     LOG("accepted peer over isock");
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -50,7 +47,7 @@ static int accept_usock(struct epoll_context* ep_ctx, epoll_stream_arr* relay_st
     LOG("accepted relay over usock");
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -69,7 +66,7 @@ int d_print_log(enum daemon_type d_type) {
     fclose(log_file);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -78,7 +75,7 @@ int d_init_dir() {
     CHECK(rcn_dir == -1 && errno != EEXIST);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -95,7 +92,7 @@ int d_init_log(enum daemon_type d_type) {
     CHECK(setvbuf(stderr, NULL, _IONBF, 0) != 0);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -111,7 +108,7 @@ static int resolve_host(const int port, const char *host, struct addrinfo** addr
     return 0;
 err:
     errno = EHOSTUNREACH;
-    DEBUG_LOG(" %s", gai_strerror(res));
+    ERR_LOG(" %s", gai_strerror(res));
     return -1;
 }
 
@@ -144,7 +141,7 @@ err:
     return -1;
 }
 
-static int init_inet_sock(const int port) {
+int d_init_inet_sock(const int port) {
     const int isock_fd = TRY(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), -1);
     const int reuse = 1;
     CHECK(setsockopt(isock_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1);
@@ -157,7 +154,7 @@ static int init_inet_sock(const int port) {
     LOG("listening on port %d", port);
     return isock_fd;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -204,7 +201,7 @@ static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buf
     }
     return nfds;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -247,7 +244,7 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -260,7 +257,7 @@ static int cleanup(struct d_context* d_ctx, char* usock_path) {
     CHECK(unlink(usock_path) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -274,7 +271,7 @@ static int d_loop(struct d_context* d_ctx) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -301,6 +298,13 @@ static int d_init(struct daemon_arg arg) {
 
     CHECK(e_init_epoll_ctx(&ep_ctx) == -1);
 
+    int net_fd = 0;
+    if (arg.type == DAEMON_SERVER)
+        net_fd = TRY(d_init_inet_sock(arg.port), -1);
+    else
+        net_fd = TRY(init_peer_sock(arg.port, arg.host), -1);
+    CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.port, arg.type) == -1);
+
     char* usock_path;
     size_t sock_len;
     if (arg.type == DAEMON_SERVER) {
@@ -312,14 +316,6 @@ static int d_init(struct daemon_arg arg) {
     }
     const int usock_fd = TRY(r_init_usock(usock_path, sock_len), -1);
     CHECK(r_init_relay_ctx(&ep_ctx, &relay_ctx, usock_fd) == -1);
-
-    int net_fd = 0;
-    if (arg.type == DAEMON_SERVER)
-        net_fd = TRY(init_inet_sock(arg.port), -1);
-    else
-        net_fd = TRY(init_peer_sock(arg.port, arg.host), -1);
-    CHECK(p_init_peer_ctx(&ep_ctx, &peer_ctx, net_fd, arg.type) == -1);
-
     CHECK(dev_init_device_ctx(&d_ctx, arg.devices_arg, arg.type) == -1);
 
     int64_t status_success = DAEMON_STATUS_OK;
@@ -330,7 +326,7 @@ static int d_init(struct daemon_arg arg) {
 err:
     int64_t status_err = errno;
     CHECK(write(arg.evtfd, &status_err, sizeof(status_err)) == -1);
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -345,6 +341,6 @@ int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg) {
         CHECK(relay_start(r_arg) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }

@@ -12,7 +12,7 @@ int e_init_epoll_ctx(struct epoll_context* ep_ctx) {
     CHECK(u_array_init(&ep_ctx->stream_ptrs.r, sizeof(struct epoll_stream*), RCN_STD_CAPACITY) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -26,7 +26,7 @@ int e_close_epoll_ctx(struct epoll_context* ep_ctx) {
     close(ep_ctx->epoll_fd);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -42,7 +42,7 @@ int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, st
     *out_stream = stream;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -51,7 +51,7 @@ int e_epoll_add(struct epoll_context* ep_ctx, int fd, enum fd_type type) {
     CHECK(e_epoll_add_getr(ep_ctx, fd, type, &tmp_stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -67,7 +67,7 @@ int e_epoll_add_device(struct epoll_context* ep_ctx, int fd, struct device* devi
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -76,7 +76,7 @@ int e_epoll_reset_stream(struct epoll_context* ep_ctx, struct epoll_stream* stre
     CHECK(e_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -88,7 +88,7 @@ int e_epoll_sync_stream(struct epoll_context* ep_ctx, struct epoll_stream* strea
     CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_MOD, stream->fd, &evt) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -96,21 +96,19 @@ int e_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
     switch (stream->fd_type) {
         case FD_RELAY: r_close_relay(d_ctx->relay_ctx, stream); break;
         case FD_DEV: dev_close_dev(d_ctx->device_ctx, stream); break;
-        case FD_ISOCK: p_close_peer(d_ctx->ep_ctx, d_ctx->peer_ctx); break;
         case FD_PEER: p_close_peer(d_ctx->ep_ctx, d_ctx->peer_ctx); break;
         default: ERR_GOTO(err, "err: unknown fd_type\n");
     }
     CHECK(e_epoll_close_remove_simple(d_ctx->ep_ctx, stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
 int e_epoll_close_remove_simple(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
     int res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, stream->fd, NULL);
-    // Ignore already deleted FDs
-    CHECK(res == -1 && errno != ENOENT);
+    CHECK(res == -1 && errno != ENOENT); // Ignore already deleted FDs
     size_t index = TRY(u_array_find_index(&ep_ctx->stream_ptrs.r, &stream), -1);
     CHECK(u_array_remove(&ep_ctx->stream_ptrs.r, index) == -1);
     CHECK(stream_close(stream) == -1);
@@ -118,6 +116,6 @@ int e_epoll_close_remove_simple(struct epoll_context* ep_ctx, struct epoll_strea
     return 0;
 err:
     close(stream->fd);
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }

@@ -25,7 +25,7 @@ int stream_init(struct epoll_stream* stream, int fd, enum fd_type type) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -44,7 +44,7 @@ static int stream_queue_reading(struct epoll_stream* stream, enum stream_type ty
     CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -52,7 +52,7 @@ int stream_queue_reading_socket(struct epoll_stream* stream) {
     CHECK(stream_queue_reading(stream, STREAM_TYPE_SOCKET) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -60,7 +60,7 @@ int stream_queue_reading_device(struct epoll_stream* stream) {
     CHECK(stream_queue_reading(stream, STREAM_TYPE_DEVICE) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -83,7 +83,7 @@ static int stream_queue_writing(struct epoll_context* ep_ctx, struct epoll_strea
     CHECK(e_epoll_sync_stream(ep_ctx, stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -91,7 +91,7 @@ int stream_queue_writing_socket(struct epoll_context* ep_ctx, struct epoll_strea
     CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_SOCKET, header, size, data) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -99,7 +99,7 @@ int stream_queue_writing_device(struct epoll_context* ep_ctx, struct epoll_strea
     CHECK(stream_queue_writing(ep_ctx, stream, STREAM_TYPE_DEVICE, 0, 0, &event) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -116,7 +116,7 @@ int stream_set_default(struct epoll_stream* stream, enum stream_operation defaul
     stream_item->type = default_type;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -124,7 +124,7 @@ int stream_clear_fallback(struct epoll_stream* stream) {
     CHECK(stream_set_default(stream, stream->default_op, stream->default_type) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -151,7 +151,7 @@ static int calc_stream_info(struct stream_item* stream_item, struct stream_info*
     stream_info->size_remaining = stream_info->size_total - stream_item->buffer_streamed;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -198,7 +198,7 @@ int stream_stream(struct epoll_stream* stream) {
     return 0;
 err:
     stream_item->state = STREAM_STREAMING_CLOSED;
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -213,7 +213,7 @@ int stream_collect(struct epoll_stream* stream, struct stream_item** stream_data
         CHECK(u_queue_peek(&stream->queue.r, (void**)&stream->next) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -231,7 +231,7 @@ int stream_close(struct epoll_stream* stream) {
     stream->fd = -1;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -240,6 +240,6 @@ int stream_shutdown(struct epoll_stream* stream) {
     CHECK(stream_close(stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }

@@ -22,7 +22,7 @@ static int has_active_key(int dev_fd) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -33,7 +33,7 @@ static int has_any_active_inputs(struct device* device) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -46,7 +46,7 @@ static int drain_events(struct device* dev) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -62,7 +62,7 @@ int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const cha
     return 0;
 err:
     *out_dev = NULL;
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -75,7 +75,7 @@ int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum dae
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -89,7 +89,7 @@ int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* de
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -103,7 +103,7 @@ int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* de
     CHECK(u_array_free(&dev_ctx->devices.r) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -124,7 +124,7 @@ int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_
     CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_UPD_GRAB, size, &msg) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -147,7 +147,7 @@ int dev_get_device_info(int dev_fd, struct device* device) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -158,7 +158,7 @@ static int set_udev_bits(int u_fd, unsigned long set_ioctl, uint8_t* bitmap, int
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -196,7 +196,7 @@ static int apply_udev_info(int u_fd, struct device* device, struct device_info* 
     CHECK(ioctl(u_fd, UI_DEV_CREATE) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -212,7 +212,7 @@ int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct devi
 err:
     if (u_fd != -1)
         close(u_fd);
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -224,7 +224,7 @@ int dev_find_by_id(device_arr* devices, size_t random_id, struct device** out_de
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -243,7 +243,7 @@ int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -265,7 +265,7 @@ int dev_release_virt_keys(struct epoll_context* ep_ctx, struct device* device) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -277,7 +277,7 @@ int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices)
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -286,7 +286,7 @@ int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
     CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -307,7 +307,7 @@ int dev_ctrl_devices(struct epoll_context* ep_ctx, struct peer_context* p_ctx, d
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -328,6 +328,6 @@ int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct str
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_EVENT, sizeof(struct peer_msg_event), &msg) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }

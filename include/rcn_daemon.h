@@ -27,6 +27,7 @@ struct daemon_arg {
 /* rcn_daemon.c */
 int d_init_dir();
 int d_init_log(enum daemon_type d_type);
+int d_init_inet_sock(const int port);
 int d_print_log(enum daemon_type d_type);
 int d_fork(struct d_context* d_ctx, struct relay_arg r_arg);
 int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg);

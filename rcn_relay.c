@@ -42,7 +42,7 @@ static int init_sockinfo(enum daemon_type d_type, struct sock_info* info) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -58,7 +58,7 @@ int r_init_usock(char* sock_path, size_t path_len) {
     LOG("created unix socket");
     return d_usock_fd;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -82,7 +82,7 @@ int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* rel
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -90,13 +90,20 @@ static int check_daemon_status(int eventfd) {
     printf("...");
     fflush(stdout);
     int64_t status = 0;
-    CHECK(read(eventfd, &status, sizeof(status)) == -1);
+    const int flags = TRY(fcntl(eventfd, F_GETFL), -1);
+    CHECK(fcntl(eventfd, F_SETFL, flags | O_NONBLOCK) == -1);
+    struct pollfd fds = {};
+    fds.fd = eventfd;
+    fds.events = POLLIN;
+    fflush(stdout);
+    CHECK(poll(&fds, 1, 5000) == -1);
+    read(eventfd, &status, sizeof(status));
     CHECK(status != DAEMON_STATUS_OK);
     return 0;
 err:
-    fprintf(stderr, "\rerr: %s\n", strerror(status));
+    fprintf(stderr, "\rerr: cannot start daemon [%s]\n", strerror(status));
     fflush(stderr);
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -135,7 +142,7 @@ static int handle_request(struct stream_item* item) {
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -172,7 +179,7 @@ int relay_start(struct relay_arg arg) {
     CHECK(stream_shutdown(&stream) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -181,7 +188,7 @@ int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream) {
     CHECK(u_array_remove(&r_ctx->relay_streams.r, index) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -190,7 +197,7 @@ static int handler_start(struct d_context* d_ctx, struct epoll_stream* stream, s
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_START, 0, NULL) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -214,7 +221,7 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -232,7 +239,7 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
     d_ctx->state = RCN_RUNNING;
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -245,7 +252,7 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -270,7 +277,7 @@ send:
     CHECK(u_array_free(&list.r) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -304,7 +311,7 @@ int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
     }
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -314,7 +321,7 @@ int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, 
     CHECK(e_epoll_add(ep_ctx, usock_fd, FD_USOCK) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
 
@@ -328,6 +335,6 @@ int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx)
     CHECK(u_array_free(&r_ctx->relay_streams.r) == -1);
     return 0;
 err:
-    DEBUG_LOG("");
+    ERR_LOG("");
     return -1;
 }
