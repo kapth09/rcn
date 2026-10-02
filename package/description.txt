@@ -1,0 +1,2 @@
+Remote control program for linux
+A remote control program to replay eventX inputs on another computer.

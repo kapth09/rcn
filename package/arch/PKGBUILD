@@ -1,0 +1,12 @@
+# Maintainer: kapth09
+pkgname=rcn
+pkgver=0.0.1
+pkgrel=1
+pkgdesc="Remote control program to replay eventX inputs on another computer"
+arch=('x86_64')
+url="https://github.com/kapth09/rcn"
+license=('GPL-3.0-or-later')
+depends=('glibc')
+makedepends=('gcc' 'make')
+source=("${pkgname}-${pkgver}.tar.gz")
+sha256sums=('4d48ac0554aea8069af8c6ee2f13658a9f557ed7ac67b99a393973522fa9a646')
