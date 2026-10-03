@@ -2,7 +2,7 @@
 
 Always update the version number!
 
-Compile the program using ``make normal``
+Compile the program using ``make standard``
 
 Move the package into ``./releases/x.y.z/``, this directory is ignored by git.
 
