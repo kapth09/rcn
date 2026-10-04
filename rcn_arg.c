@@ -8,6 +8,7 @@ static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_PAUSE] =  ARG_SUBACTION_PAUSE,
     [SUBACTION_RESUME] = ARG_SUBACTION_RESUME,
     [SUBACTION_STOP] = ARG_SUBACTION_STOP,
+    [SUBACTION_SWITCH] = ARG_SUBACTION_SWITCH,
     [SUBACTION_LOG] = ARG_SUBACTION_LOG,
     [SUBACTION_LIST] = ARG_SUBACTION_LIST,
     [SUBACTION_LS] = ARG_SUBACTION_LS,
@@ -22,6 +23,7 @@ static const struct arg_help_data help_data[] = {
     {ARG_SUBACTION_PAUSE, ARG_HELP_SUBACTION_PAUSE},
     {ARG_SUBACTION_RESUME, ARG_HELP_SUBACTION_RESUME},
     {ARG_SUBACTION_STOP, ARG_HELP_SUBACTION_STOP},
+    {ARG_SUBACTION_SWITCH, ARG_HELP_SUBACTION_SWITCH},
     {ARG_SUBACTION_LOG, ARG_HELP_SUBACTION_LOG},
     {ARG_SUBACTION_LIST, ARG_HELP_SUBACTION_LIST},
     {ARG_SUBACTION_LS, ARG_HELP_SUBACTION_LIST},
@@ -37,6 +39,7 @@ static const struct arg_handler handlers[] = {
     {ARG_SUBACTION_PAUSE, ARG_SUBACTION_PAUSE, arg_daemon},
     {ARG_SUBACTION_RESUME, ARG_SUBACTION_RESUME, arg_daemon},
     {ARG_SUBACTION_STOP, ARG_SUBACTION_STOP, arg_daemon},
+    {ARG_SUBACTION_SWITCH, ARG_SUBACTION_SWITCH, arg_daemon},
     {ARG_SUBACTION_LOG, ARG_SUBACTION_LOG, arg_daemon},
     {ARG_SUBACTION_LS, ARG_SUBACTION_LIST, arg_daemon},
 };
@@ -60,6 +63,7 @@ static void print_help() {
     printf("\n\t%s: %s", ARG_SUBACTION_PAUSE, ARG_DESC_SUBACTION_PAUSE);
     printf("\n\t%s: %s", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
     printf("\n\t%s: %s", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
+    printf("\n\t%s: %s", ARG_SUBACTION_SWITCH, ARG_DESC_SUBACTION_SWITCH);
     printf("\n\t%s: %s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
     printf("\n\t%s: %s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
     printf("\n\n");
@@ -270,6 +274,7 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_STOP: return RELAY_HEADER_STOP;
         case SUBACTION_LIST: return RELAY_HEADER_LIST;
         case SUBACTION_LS: return RELAY_HEADER_LIST;
+        case SUBACTION_SWITCH: return RELAY_HEADER_SWITCH;
         default:
             DEBUG_LOG("");
             return -1;

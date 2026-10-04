@@ -9,6 +9,7 @@
 #define ARG_SUBACTION_PAUSE 	"pause"
 #define ARG_SUBACTION_RESUME 	"resume"
 #define ARG_SUBACTION_STOP 	    "stop"
+#define ARG_SUBACTION_SWITCH    "switch"
 #define ARG_SUBACTION_LOG       "log"
 #define ARG_SUBACTION_LIST      "list"
 #define ARG_SUBACTION_LS        "ls"
@@ -21,6 +22,7 @@
 #define ARG_DESC_SUBACTION_PAUSE   "Pause the capturing of the devices"
 #define ARG_DESC_SUBACTION_RESUME  "Resume the capturing of the devices"
 #define ARG_DESC_SUBACTION_STOP    "Stop the program"
+#define ARG_DESC_SUBACTION_SWITCH  "Switch betwen paused/running state"
 #define ARG_DESC_SUBACTION_LOG     "Print the logs to stdout"
 #define ARG_DESC_SUBACTION_LIST    "List captured devices"
 
@@ -59,6 +61,7 @@
                                     "The server keeps running and new clients can connect.\n\t" \
                                     "If 'action' is set to 'server', the server closes the connection, deletes the copied devices and the background process is stopped.\n\t" \
                                     "No clients can connect anymore (unless started again)."
+#define ARG_HELP_SUBACTION_SWITCH   "Acts as a 'toggle'. If the daemon is paused, it's like calling 'resume' and if the daemon is running, it's like calling 'pause'."
 #define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
                                     "If --debug is set, more info is available."
 #define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not. 'list' and 'ls' are the equivalent."
@@ -74,6 +77,7 @@ enum subaction_type {
     SUBACTION_PAUSE,
     SUBACTION_RESUME,
     SUBACTION_STOP,
+    SUBACTION_SWITCH,
     SUBACTION_LOG,
     SUBACTION_LIST,
     SUBACTION_LS,
@@ -173,9 +177,7 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_help(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_debug(int argc, char** argv, int* i, struct arg_context* ctx);
-
 int parse_args(int argc, char** argv, int start_arg, struct arg_context* ctx);
-
 int subaction_to_rcn_msg(enum subaction_type saction);
 
 #endif //RCN_RCN_ARG_H

@@ -108,6 +108,31 @@ err:
     return -1;
 }
 
+static int request_list(struct stream_item* item) {
+    if (item->payload.msg.header.size == 0) {
+        printf("\rrcn: no devices captured\n");
+        return 0;
+    }
+    relay_devices_list list = {};
+    list.r.size = sizeof(struct relay_data_list);
+    list.r.length = item->payload.msg.header.size / list.r.size;
+    list.r.data = item->payload.msg.buffer;
+    list.r.capacity = list.r.size * list.r.length;
+    for (size_t i = 0; i < list.r.length; i++) {
+        struct relay_data_list* list_entry = {};
+        CHECK(u_array_getr(&list.r, (void**)&list_entry, i++) == -1);
+        printf("\rrcn: %s ", list_entry->dev_name);
+        if (list_entry->grabbed)
+            printf("[grabbed]\n");
+        else
+            printf("[ungrabbed]\n");
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static int handle_request(struct stream_item* item) {
     enum relay_msg_header header = item->payload.msg.header.value;
     switch (header) {
@@ -118,27 +143,7 @@ static int handle_request(struct stream_item* item) {
         case RELAY_HEADER_RESUME_AGAIN:
         case RELAY_HEADER_NO_PEER:
         case RELAY_HEADER_STOP: printf("\rrcn: %s\n", relay_text[header]); break;
-        case RELAY_HEADER_LIST: {
-            if (item->payload.msg.header.size == 0) {
-                printf("rcn: no devices captured\n");
-                break;
-            }
-            relay_devices_list list = {};
-            list.r.size = sizeof(struct relay_data_list);
-            list.r.length = item->payload.msg.header.size / list.r.size;
-            list.r.data = item->payload.msg.buffer;
-            list.r.capacity = list.r.size * list.r.length;
-            for (size_t i = 0; i < list.r.length; i++) {
-                struct relay_data_list* list_entry = {};
-                CHECK(u_array_getr(&list.r, (void**)&list_entry, i++) == -1);
-                printf("\rrcn> %s ", list_entry->dev_name);
-                if (list_entry->grabbed)
-                    printf("[grabbed]\n");
-                else
-                    printf("[ungrabbed]\n");
-            }
-            break;
-        }
+        case RELAY_HEADER_LIST: request_list(item); break;
         default: goto err;
     }
     return 0;
@@ -252,6 +257,18 @@ err:
     return -1;
 }
 
+static int handler_switch(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    if (d_ctx->state == RCN_RUNNING) {
+        CHECK(handler_pause(d_ctx, stream, stream_item) == -1);
+    } else if (d_ctx->state == RCN_PAUSED) {
+        CHECK(handler_resume(d_ctx, stream, stream_item) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
     (void)stream;
@@ -293,7 +310,7 @@ err:
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     switch (stream_item->payload.msg.header.value) {
         case RELAY_HEADER_IDLE: {
-            // CHECK(handler_idle(d_ctx, stream, stream_item) == -1);
+            // do nothing so the relay hangs on read()
             break;
         }
         case RELAY_HEADER_START: {
@@ -310,6 +327,10 @@ int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
         }
         case RELAY_HEADER_STOP: {
             CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case RELAY_HEADER_SWITCH: {
+            CHECK(handler_switch(d_ctx, stream, stream_item) == -1);
             break;
         }
         case RELAY_HEADER_LIST: {
