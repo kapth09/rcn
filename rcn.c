@@ -131,6 +131,17 @@ err:
     return -1;
 }
 
+static int action_show(int argc, char** argv) {
+    if (daemon_is_running(DAEMON_CLIENT) == 0) {
+
+    } else if (daemon_is_running(DAEMON_SERVER) == 0) {
+
+    } else {
+
+    }
+    return 0;
+}
+
 static int auto_subaction(int argc, char** argv) {
     arg_ctx.daemon.info.needed = true;
     CHECK(parse_args(argc, argv, 1, &arg_ctx) == -1);
@@ -176,6 +187,8 @@ int main(int argc, char** argv) {
         CHECK(action_server(argc, argv) == -1);
     else if (strcmp(action, ARG_ACTION_CLIENT) == 0)
         CHECK(action_client(argc, argv) == -1);
+    else if (strcmp(action, ARG_ACTION_SHOW) == 0)
+        CHECK(action_show(argc, argv));
     else if (strcmp(action, ARG_FLAG_HELP) == 0)
         CHECK(help(argc, argv) == -1);
     else

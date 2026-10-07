@@ -1,6 +1,9 @@
 #include "include/rcn.h"
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
+
+#include <dirent.h>
+
 #include "include/rcn_epoll.h"
 #include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
@@ -43,6 +46,22 @@ static int drain_events(struct device* dev) {
         int has = TRY(has_any_active_inputs(dev), -1);
         if (has == 0)
             break;
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+int dev_get_all_devices(char_arr* devices) {
+    DIR* dir = TRY(opendir(RCN_DEV_EVENT_PATH), NULL);
+    errno = 0;
+    for (;;) {
+        struct dirent* ent = readdir(dir);
+        if (ent == NULL) {
+            CHECK(errno != 0); // if errno does not equal 0, readdir failed, else end of directory is reached
+            break;
+        }
     }
     return 0;
 err:

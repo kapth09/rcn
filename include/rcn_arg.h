@@ -5,6 +5,7 @@
 #define ARG_ACTION_CONNECT 	"connect"
 #define ARG_ACTION_SERVER   "server"
 #define ARG_ACTION_CLIENT   "client"
+#define ARG_ACTION_SHOW     "show"
 
 #define ARG_SUBACTION_PAUSE 	"pause"
 #define ARG_SUBACTION_RESUME 	"resume"
@@ -18,6 +19,7 @@
 #define ARG_DESC_ACTION_CONNECT     "Connect to the given server and capture the list of devices"
 #define ARG_DESC_ACTION_SERVER      "Interact with the server daemon via subactions"
 #define ARG_DESC_ACTION_CLIENT      "Interact with the client daemon via subactions"
+#define ARG_DESC_ACTION_SHOW        "Show all available devices for capture"
 
 #define ARG_DESC_SUBACTION_PAUSE   "Pause the capturing of the devices"
 #define ARG_DESC_SUBACTION_RESUME  "Resume the capturing of the devices"
@@ -54,6 +56,7 @@
                                 "When the client is actively running, input events are sent to the server."
 #define ARG_HELP_ACTION_SERVER  "Interact with the server background process via subactions."
 #define ARG_HELP_ACTION_CLIENT  "Interact with the client background process via subactions."
+#define ARG_HELP_ACTION_SHOW    "Show every device plugged into the client which is available for capture."
 
 #define ARG_HELP_SUBACTION_PAUSE    "The client ungrabs the devices and no input data is sent to the server."
 #define ARG_HELP_SUBACTION_RESUME   "The client regrabs the devices and input data is sent to the server."

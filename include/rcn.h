@@ -69,6 +69,8 @@ extern enum debug_level g_debug_level;
 #define RCN_STD_CAPACITY 10
 #define RCN_DEV_MAX_NAME_LEN 255
 
+#define RCN_DEV_EVENT_PATH "/dev/input"
+
 #define RCN_PROC_NAME_SERVER "rcn_server"
 #define RCN_PROC_NAME_CLIENT "rcn_client"
 #define RCN_PROC_NAME_RELAY  "rcn_relay"

@@ -57,6 +57,7 @@ static void print_help() {
     printf("\n\t%s: %s", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
     printf("\n\t%s: %s", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
     printf("\n\t%s: %s", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
+    printf("\n\t%s: %s", ARG_ACTION_SHOW, ARG_DESC_ACTION_SHOW);
     printf("\n\n");
 
     printf("Possible subaction are:");
