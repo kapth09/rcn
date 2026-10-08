@@ -50,6 +50,7 @@ enum device_ctrl {
 int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
 int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev);
 int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type);
+int dev_get_all_devices(device_name_arr* devices);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_get_device_info(int dev_fd, struct device* dev);

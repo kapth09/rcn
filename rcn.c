@@ -132,14 +132,26 @@ err:
 }
 
 static int action_show(int argc, char** argv) {
-    if (daemon_is_running(DAEMON_CLIENT) == 0) {
-
-    } else if (daemon_is_running(DAEMON_SERVER) == 0) {
-
-    } else {
-
+    device_name_arr dev_names = {};
+    CHECK(u_array_init(&dev_names.r, RCN_DEV_MAX_NAME_LEN, RCN_STD_CAPACITY) == -1);
+    CHECK(dev_get_all_devices(&dev_names) == -1);
+    for (size_t i = 0; i < dev_names.r.length; i++) {
+         char name[dev_names.r.size] = {};
+        CHECK(u_array_getv(&dev_names.r, (void**)&name, i) == -1);
+        printf("%s\n", name);
     }
+    CHECK(u_array_free(&dev_names.r) == -1);
+//    if (daemon_is_running(DAEMON_CLIENT) == 0) {
+//
+//    } else if (daemon_is_running(DAEMON_SERVER) == 0) {
+//
+//    } else {
+//
+//    }
     return 0;
+err:
+    ERR_LOG("");
+    return -1;
 }
 
 static int auto_subaction(int argc, char** argv) {

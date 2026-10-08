@@ -1,12 +1,10 @@
 #include "include/rcn.h"
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
-
-#include <dirent.h>
-
 #include "include/rcn_epoll.h"
 #include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,16 +51,33 @@ err:
     return -1;
 }
 
-int dev_get_all_devices(char_arr* devices) {
+int dev_get_all_devices(device_name_arr* devices) {
     DIR* dir = TRY(opendir(RCN_DEV_EVENT_PATH), NULL);
     errno = 0;
+    const size_t input_path_len = strlen(RCN_DEV_EVENT_PATH);
     for (;;) {
         struct dirent* ent = readdir(dir);
         if (ent == NULL) {
             CHECK(errno != 0); // if errno does not equal 0, readdir failed, else end of directory is reached
             break;
         }
+        if (strncmp(ent->d_name, "event", 5) != 0)
+            continue;
+        const size_t dev_path_len = input_path_len + strlen(ent->d_name) + 2;
+        char dev_path[dev_path_len] = {};
+        snprintf(dev_path, dev_path_len, "%s/%s", RCN_DEV_EVENT_PATH, ent->d_name);
+        const int dev_fd = TRY(open(dev_path, O_RDONLY), -1);
+        uint8_t evt_bits[MAX_EVT_BYTES] = {};
+        CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evt_bits)), evt_bits) == -1);
+//         const bool has_key = HAS_BIT(evt_bits, EV_KEY);
+//         const bool has_rel = HAS_BIT(evt_bits, EV_REL);
+//         const bool has_abs = HAS_BIT(evt_bits, EV_ABS);
+//         const bool has_swt = HAS_BIT(evt_bits, EV_SW);
+        char name_buff[devices->r.size] = {};
+        CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(name_buff)), name_buff) == -1);
+        CHECK(u_array_add(&devices->r, name_buff) == -1);
     }
+    closedir(dir);
     return 0;
 err:
     ERR_LOG("");

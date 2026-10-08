@@ -8,6 +8,7 @@ U_DEFINE_ARR(epoll_stream_arr, struct epoll_stream*);
 U_DEFINE_ARR(device_arr, struct device);
 U_DEFINE_ARR(char_arr, char*);
 U_DEFINE_ARR(relay_devices_list, struct relay_data_list);
+U_DEFINE_ARR(device_name_arr, char[RCN_DEV_MAX_NAME_LEN]);
 
 U_DEFINE_QUEUE(stream_queue, struct stream_data);
 
