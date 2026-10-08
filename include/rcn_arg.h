@@ -1,6 +1,8 @@
 #ifndef RCN_RCN_ARG_H
 #define RCN_RCN_ARG_H
 
+#include "rcn_device.h"
+
 #define ARG_ACTION_START 	"start"
 #define ARG_ACTION_CONNECT 	"connect"
 #define ARG_ACTION_SERVER   "server"
@@ -41,10 +43,10 @@
 #define ARG_FLAG_FILTER         "-f"
 #define ARG_FLAG_LONG_FILTER    "--filter"
 
-#define ARG_FILTER_EVT_KEY      "key"
-#define ARG_FILTER_EVT_REL      "rel"
-#define ARG_FILTER_EVT_ABS      "abs"
-#define ARG_FILTER_EVT_SWT      "swt"
+#define ARG_FILTER_EVT_KEY      DEVICE_EVT_KEY_STR
+#define ARG_FILTER_EVT_REL      DEVICE_EVT_REL_STR
+#define ARG_FILTER_EVT_ABS      DEVICE_EVT_ABS_STR
+#define ARG_FILTER_EVT_SWT      DEVICE_EVT_SWT_STR
 
 #define ARG_DESC_FLAG_PORT      "Port on which to listen on/connect to"
 #define ARG_DESC_FLAG_HOST      "Hostname/ip-address of the server"
@@ -57,14 +59,19 @@
                                 "Starts the server in the background, listening on the given port (-p/--port).\n\t" \
                                 "Then, the client can run 'rcn connect ...' and transmit their captures devices.\n\t" \
                                 "Every device specified in the 'rcn connect' command is recreated on the server and inputs are replayed."
-#define ARG_HELP_ACTION_CONNECT "Usage: rcn connect -p <port> -s <server addr.> -d </path/to/dev> ...\n\t"\
+#define ARG_HELP_ACTION_CONNECT "Usage: rcn connect -p <port> -s <server addr.> -d </path/to/dev> ...\n\t" \
                                 "Connect to an already started rcn server on the given port (-p/--port).\n\t" \
                                 "The server is specified with the '-s'/'--server' flag, which can either be an IPv4 address or the hostname.\n\t"\
-                                "Every listed device/event-file is captured and copied to the server.\n\t"\
+                                "Every listed device/event-file is captured and copied to the server.\n\t" \
                                 "When the client is actively running, input events are sent to the server."
 #define ARG_HELP_ACTION_SERVER  "Interact with the server background process via subactions."
 #define ARG_HELP_ACTION_CLIENT  "Interact with the client background process via subactions."
-#define ARG_HELP_ACTION_SHOW    "Show every device plugged into the client which is available for capture."
+#define ARG_HELP_ACTION_SHOW    "List every device's full name, path and event type.\n\t" \
+                                "The -f/--filter flag filters the devices by their event type.\n\t" \
+                                "A device can have multiple types.\n\t" \
+                                "The device driver/firmware can report more event types than the device actually has.\n\t" \
+                                "Possible filters are:\n\t" \
+                                "\tkey/KEY (keyboards), rel/REL (mice), abs/ABS (touchpads), swt/SWT (binary switches)"
 
 #define ARG_HELP_SUBACTION_PAUSE    "The client ungrabs the devices and no input data is sent to the server."
 #define ARG_HELP_SUBACTION_RESUME   "The client regrabs the devices and input data is sent to the server."
@@ -103,7 +110,7 @@ struct arg_info {
 
 union arg_data {
     enum subaction_type saction;
-    enum filter_type filter;
+    enum event_types filter;
     int v_int;
     char* v_char;
     char_arr v_char_arr;
@@ -139,6 +146,12 @@ struct arg_help_data {
     fprintf(stderr, "err: invalid value '%s' for '%s'\n",   \
         value, type);                                       \
     goto err;                                               \
+})
+
+#define EARG_OVERFLOW(type, max) ({                                     \
+    fprintf(stderr, "err: to many values for flag '%s (max: %d)'\n",    \
+        type, max);                                                     \
+    goto err;                                                           \
 })
 
 #define EARG_UNKNOWN(type, value) ({            \

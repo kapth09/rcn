@@ -12,6 +12,20 @@
 #include <sys/random.h>
 #include <unistd.h>
 
+const int device_evt_val_arr[] = {
+    [DEVICE_EVT_KEY_INDEX] = DEVICE_EVT_KEY,
+    [DEVICE_EVT_REL_INDEX] = DEVICE_EVT_REL,
+    [DEVICE_EVT_ABS_INDEX] = DEVICE_EVT_ABS,
+    [DEVICE_EVT_SWT_INDEX] = DEVICE_EVT_SWT,
+};
+const char* device_evt_str_arr[DEVICE_EVT_COUNT_INDEX] = {
+    [DEVICE_EVT_KEY_INDEX] = DEVICE_EVT_KEY_STR,
+    [DEVICE_EVT_REL_INDEX] = DEVICE_EVT_REL_STR,
+    [DEVICE_EVT_ABS_INDEX] = DEVICE_EVT_ABS_STR,
+    [DEVICE_EVT_SWT_INDEX] = DEVICE_EVT_SWT_STR,
+};
+const int device_evt_str_length = sizeof(device_evt_val_arr) / sizeof(device_evt_val_arr[0]);
+
 static int has_active_key(int dev_fd) {
     if (dev_fd <= 0)
         DO_GOTO(fprintf(stderr, "err: dev_fd is <= 0\n"), err);
@@ -51,7 +65,16 @@ err:
     return -1;
 }
 
-int dev_get_all_devices(device_name_arr* devices, enum filter_type filter) {
+static int filter_dev_set_info(uint8_t* evt_bits, enum event_types filter, enum event_types type, int evt, enum event_types* out) {
+    bool has_bit = HAS_BIT(evt_bits, evt);
+    if (has_bit)
+        *out |= type;
+    if (!has_bit && (filter & type))
+        return -1;
+    return 0;
+}
+
+int dev_get_all_devices(basic_dev_info_arr* dev_binfos, enum event_types filter) {
     DIR* dir = TRY(opendir(RCN_DEV_EVENT_PATH), NULL);
     errno = 0;
     const size_t input_path_len = strlen(RCN_DEV_EVENT_PATH);
@@ -63,33 +86,48 @@ int dev_get_all_devices(device_name_arr* devices, enum filter_type filter) {
         }
         if (strncmp(ent->d_name, "event", 5) != 0)
             continue;
-        const size_t dev_path_len = input_path_len + strlen(ent->d_name) + 2;
-        char dev_path[dev_path_len] = {};
-        snprintf(dev_path, dev_path_len, "%s/%s", RCN_DEV_EVENT_PATH, ent->d_name);
-        const int dev_fd = TRY(open(dev_path, O_RDONLY), -1);
+        size_t event_path_len = input_path_len + strlen(ent->d_name) + 2;
+        char event_path[event_path_len];
+        snprintf(event_path, event_path_len, "%s/%s", RCN_DEV_EVENT_PATH, ent->d_name);
+        const int dev_fd = TRY(open(event_path, O_RDONLY), -1);
         uint8_t evt_bits[MAX_EVT_BYTES] = {};
         CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evt_bits)), evt_bits) == -1);
-        const bool has_key = HAS_BIT(evt_bits, EV_KEY);
-        const bool has_rel = HAS_BIT(evt_bits, EV_REL);
-        const bool has_abs = HAS_BIT(evt_bits, EV_ABS);
-        const bool has_swt = HAS_BIT(evt_bits, EV_SW);
-        if (filter & FILTER_EVT_KEY && !has_key)
+        struct basic_device_info binfo = {};
+        if (filter_dev_set_info(evt_bits, filter, DEVICE_EVT_KEY, EV_KEY, &binfo.events) == -1)
             continue;
-        if (filter & FILTER_EVT_REL && !has_rel)
+        if (filter_dev_set_info(evt_bits, filter, DEVICE_EVT_REL, EV_REL, &binfo.events) == -1)
             continue;
-        if (filter & FILTER_EVT_ABS && !has_abs)
+        if (filter_dev_set_info(evt_bits, filter, DEVICE_EVT_ABS, EV_ABS, &binfo.events) == -1)
             continue;
-        if (filter & FILTER_EVT_SWT && !has_swt)
+        if (filter_dev_set_info(evt_bits, filter, DEVICE_EVT_SWT, EV_SW, &binfo.events) == -1)
             continue;
-        char name_buff[devices->r.size] = {};
-        CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(name_buff)), name_buff) == -1);
-        CHECK(u_array_add(&devices->r, name_buff) == -1);
+        snprintf(binfo.eventX, sizeof(binfo.eventX), "%s", ent->d_name);
+        CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(binfo.name)), binfo.name) == -1);
+        CHECK(u_array_add(&dev_binfos->r, &binfo) == -1);
     }
     closedir(dir);
     return 0;
 err:
     ERR_LOG("");
     return -1;
+}
+
+int dev_print_basic_info(struct basic_device_info binfo) {
+    putchar('[');
+    int c = 0;
+    for (int i = 0; i < DEVICE_EVT_COUNT_INDEX; i++) {
+        if (binfo.events & device_evt_val_arr[i]) {
+            if (c > 0)
+                printf(",");
+            printf("%s", device_evt_str_arr[i]);
+            c++;
+        }
+    }
+    putchar(']');
+    if (c <= 1)
+        putchar('\t');
+    printf("\t%s\t\t%s", binfo.eventX, binfo.name);
+    return 0;
 }
 
 int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev) {

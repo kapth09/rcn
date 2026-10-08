@@ -5,7 +5,7 @@
 #include <string.h>
 
 static char* subactions[SUBACTION_COUNT] = {
-    [SUBACTION_PAUSE]   =  ARG_SUBACTION_PAUSE,
+    [SUBACTION_PAUSE]   = ARG_SUBACTION_PAUSE,
     [SUBACTION_RESUME]  = ARG_SUBACTION_RESUME,
     [SUBACTION_STOP]    = ARG_SUBACTION_STOP,
     [SUBACTION_SWITCH]  = ARG_SUBACTION_SWITCH,
@@ -15,25 +15,12 @@ static char* subactions[SUBACTION_COUNT] = {
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
 
-static int filter_val[] = {
-    [FILTER_EVT_KEY_INDEX] = FILTER_EVT_KEY,
-    [FILTER_EVT_REL_INDEX] = FILTER_EVT_REL,
-    [FILTER_EVT_ABS_INDEX] = FILTER_EVT_ABS,
-    [FILTER_EVT_SWT_INDEX] = FILTER_EVT_SWT,
-};
-static char* filter_str[FILTER_EVT_COUNT] = {
-    [FILTER_EVT_KEY_INDEX] = ARG_FILTER_EVT_KEY,
-    [FILTER_EVT_REL_INDEX] = ARG_FILTER_EVT_REL,
-    [FILTER_EVT_ABS_INDEX] = ARG_FILTER_EVT_ABS,
-    [FILTER_EVT_SWT_INDEX] = ARG_FILTER_EVT_SWT,
-};
-static const int filter_length = sizeof(filter_val) / sizeof(filter_val[0]);
-
 static const struct arg_help_data help_data[] = {
     {ARG_ACTION_START, ARG_HELP_ACTION_START},
     {ARG_ACTION_CONNECT, ARG_HELP_ACTION_CONNECT},
     {ARG_ACTION_SERVER, ARG_HELP_ACTION_SERVER},
     {ARG_ACTION_CLIENT, ARG_HELP_ACTION_CLIENT},
+    {ARG_ACTION_SHOW, ARG_HELP_ACTION_SHOW},
     {ARG_SUBACTION_PAUSE, ARG_HELP_SUBACTION_PAUSE},
     {ARG_SUBACTION_RESUME, ARG_HELP_SUBACTION_RESUME},
     {ARG_SUBACTION_STOP, ARG_HELP_SUBACTION_STOP},
@@ -96,6 +83,10 @@ static void print_help() {
     printf("\n\t%s/%s: %s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
     printf("\tAvailable for action:\n");
     printf("\t\t%s", ARG_ACTION_CONNECT);
+
+    printf("\n\t%s/%s: %s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
+    printf("\tAvailable for action:\n");
+    printf("\t\t%s", ARG_ACTION_SHOW);
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
     printf("\tPossible values are:\n");
@@ -213,7 +204,7 @@ int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (ctx->filter.info.provided == true)
         EARG_FLAG_AGAIN(ARG_FLAG_FILTER);
     (*i)++;
-    const int max_filter = *i + filter_length;
+    const int max_filter = *i + device_evt_str_length;
     for (; *i < argc; (*i)++) {
         char* arg = argv[*i];
         for (int fi = 0; fi < handlers_length; fi++) {
@@ -222,13 +213,17 @@ int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx) {
                 goto end;
             }
         }
-        if (*i > max_filter)
-            EARG_INVALID(arg, ARG_FLAG_FILTER);
-        for (int fi = 0; fi < filter_length; fi++) {
-            if (strcmp(filter_str[fi], arg) == 0) {
-                ctx->filter.val.filter |= filter_val[fi];
+        if (*i >= max_filter)
+            EARG_OVERFLOW(ARG_FLAG_FILTER, DEVICE_EVT_COUNT_INDEX);
+        bool found_evt = false;
+        for (int fi = 0; fi < device_evt_str_length; fi++) {
+            if (strcasecmp(device_evt_str_arr[fi], arg) == 0) {
+                ctx->filter.val.filter |= device_evt_val_arr[fi];
+                found_evt = true;
             }
         }
+        if (found_evt == false)
+            EARG_UNKNOWN("filter", arg);
     }
 end:
     ctx->filter.info.optional = true;

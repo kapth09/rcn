@@ -8,7 +8,7 @@ U_DEFINE_ARR(epoll_stream_arr, struct epoll_stream*);
 U_DEFINE_ARR(device_arr, struct device);
 U_DEFINE_ARR(char_arr, char*);
 U_DEFINE_ARR(relay_devices_list, struct relay_data_list);
-U_DEFINE_ARR(device_name_arr, char[RCN_DEV_MAX_NAME_LEN]);
+U_DEFINE_ARR(basic_dev_info_arr, struct basic_device_info);
 
 U_DEFINE_QUEUE(stream_queue, struct stream_data);
 
@@ -89,20 +89,19 @@ enum daemon_type {
     DAEMON_CLIENT,
 };
 
-enum filter_type {
-    FILTER_EVT_KEY = 1 << 1,
-    FILTER_EVT_REL = 1 << 2,
-    FILTER_EVT_ABS = 1 << 3,
-    FILTER_EVT_SWT = 1 << 4,
-    FILTER_EVT_COUNT = 255,
+enum event_types {
+    DEVICE_EVT_KEY = 1 << 1,
+    DEVICE_EVT_REL = 1 << 2,
+    DEVICE_EVT_ABS = 1 << 3,
+    DEVICE_EVT_SWT = 1 << 4,
 };
 
-enum filter_type_index {
-    FILTER_EVT_KEY_INDEX,
-    FILTER_EVT_REL_INDEX,
-    FILTER_EVT_ABS_INDEX,
-    FILTER_EVT_SWT_INDEX,
-    FILTER_EVT_COUNT_INDEX,
+enum event_type_index {
+    DEVICE_EVT_KEY_INDEX,
+    DEVICE_EVT_REL_INDEX,
+    DEVICE_EVT_ABS_INDEX,
+    DEVICE_EVT_SWT_INDEX,
+    DEVICE_EVT_COUNT_INDEX,
 };
 
 #endif //RCN_RCN_TYPES_H
