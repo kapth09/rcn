@@ -38,12 +38,20 @@
 #define ARG_FLAG_LONG_HELP      "--help"
 #define ARG_FLAG_DEBUG          "-g"
 #define ARG_FLAG_LONG_DEBUG     "--debug"
+#define ARG_FLAG_FILTER         "-f"
+#define ARG_FLAG_LONG_FILTER    "--filter"
 
-#define ARG_DESC_FLAG_PORT       "Port on which to listen on/connect to"
-#define ARG_DESC_FLAG_HOST       "Hostname/ip-address of the server"
-#define ARG_DESC_FLAG_DEVICES    "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
-#define ARG_DESC_FLAG_HELP       "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
-#define ARG_DESC_FLAG_DEBUG      "Print extra debug information in the log, should be the first argument"
+#define ARG_FILTER_EVT_KEY      "key"
+#define ARG_FILTER_EVT_REL      "rel"
+#define ARG_FILTER_EVT_ABS      "abs"
+#define ARG_FILTER_EVT_SWT      "swt"
+
+#define ARG_DESC_FLAG_PORT      "Port on which to listen on/connect to"
+#define ARG_DESC_FLAG_HOST      "Hostname/ip-address of the server"
+#define ARG_DESC_FLAG_DEVICES   "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
+#define ARG_DESC_FLAG_HELP      "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
+#define ARG_DESC_FLAG_DEBUG     "Print extra debug information in the log, should be the first argument"
+#define ARG_DESC_FLAG_FILTER    "Filter devices by event type"
 
 #define ARG_HELP_ACTION_START   "Usage: rcn start -p <port>\n\t" \
                                 "Starts the server in the background, listening on the given port (-p/--port).\n\t" \
@@ -88,13 +96,15 @@ enum subaction_type {
 };
 
 struct arg_info {
+    bool optional;
     bool needed;
     bool provided;
 };
 
 union arg_data {
-    int v_int;
     enum subaction_type saction;
+    enum filter_type filter;
+    int v_int;
     char* v_char;
     char_arr v_char_arr;
 };
@@ -110,6 +120,7 @@ struct arg_context {
     struct arg devices;
     struct arg help;
     struct arg daemon;
+    struct arg filter;
     enum debug_level* g_debug_level_ptr;
 };
 
@@ -177,6 +188,7 @@ struct arg_handler {
 int arg_port(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_host(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx);
+int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_help(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_debug(int argc, char** argv, int* i, struct arg_context* ctx);

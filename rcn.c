@@ -132,9 +132,12 @@ err:
 }
 
 static int action_show(int argc, char** argv) {
+    arg_ctx.filter.info.optional = true;
+    if (argc > 2)
+        CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
     device_name_arr dev_names = {};
     CHECK(u_array_init(&dev_names.r, RCN_DEV_MAX_NAME_LEN, RCN_STD_CAPACITY) == -1);
-    CHECK(dev_get_all_devices(&dev_names) == -1);
+    CHECK(dev_get_all_devices(&dev_names, arg_ctx.filter.val.filter) == -1);
     for (size_t i = 0; i < dev_names.r.length; i++) {
          char name[dev_names.r.size] = {};
         CHECK(u_array_getv(&dev_names.r, (void**)&name, i) == -1);

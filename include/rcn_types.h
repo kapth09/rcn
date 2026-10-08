@@ -89,4 +89,20 @@ enum daemon_type {
     DAEMON_CLIENT,
 };
 
+enum filter_type {
+    FILTER_EVT_KEY = 1 << 1,
+    FILTER_EVT_REL = 1 << 2,
+    FILTER_EVT_ABS = 1 << 3,
+    FILTER_EVT_SWT = 1 << 4,
+    FILTER_EVT_COUNT = 255,
+};
+
+enum filter_type_index {
+    FILTER_EVT_KEY_INDEX,
+    FILTER_EVT_REL_INDEX,
+    FILTER_EVT_ABS_INDEX,
+    FILTER_EVT_SWT_INDEX,
+    FILTER_EVT_COUNT_INDEX,
+};
+
 #endif //RCN_RCN_TYPES_H

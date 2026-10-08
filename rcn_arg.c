@@ -5,15 +5,29 @@
 #include <string.h>
 
 static char* subactions[SUBACTION_COUNT] = {
-    [SUBACTION_PAUSE] =  ARG_SUBACTION_PAUSE,
-    [SUBACTION_RESUME] = ARG_SUBACTION_RESUME,
-    [SUBACTION_STOP] = ARG_SUBACTION_STOP,
-    [SUBACTION_SWITCH] = ARG_SUBACTION_SWITCH,
-    [SUBACTION_LOG] = ARG_SUBACTION_LOG,
-    [SUBACTION_LIST] = ARG_SUBACTION_LIST,
-    [SUBACTION_LS] = ARG_SUBACTION_LS,
+    [SUBACTION_PAUSE]   =  ARG_SUBACTION_PAUSE,
+    [SUBACTION_RESUME]  = ARG_SUBACTION_RESUME,
+    [SUBACTION_STOP]    = ARG_SUBACTION_STOP,
+    [SUBACTION_SWITCH]  = ARG_SUBACTION_SWITCH,
+    [SUBACTION_LOG]     = ARG_SUBACTION_LOG,
+    [SUBACTION_LIST]    = ARG_SUBACTION_LIST,
+    [SUBACTION_LS]      = ARG_SUBACTION_LS,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
+
+static int filter_val[] = {
+    [FILTER_EVT_KEY_INDEX] = FILTER_EVT_KEY,
+    [FILTER_EVT_REL_INDEX] = FILTER_EVT_REL,
+    [FILTER_EVT_ABS_INDEX] = FILTER_EVT_ABS,
+    [FILTER_EVT_SWT_INDEX] = FILTER_EVT_SWT,
+};
+static char* filter_str[FILTER_EVT_COUNT] = {
+    [FILTER_EVT_KEY_INDEX] = ARG_FILTER_EVT_KEY,
+    [FILTER_EVT_REL_INDEX] = ARG_FILTER_EVT_REL,
+    [FILTER_EVT_ABS_INDEX] = ARG_FILTER_EVT_ABS,
+    [FILTER_EVT_SWT_INDEX] = ARG_FILTER_EVT_SWT,
+};
+static const int filter_length = sizeof(filter_val) / sizeof(filter_val[0]);
 
 static const struct arg_help_data help_data[] = {
     {ARG_ACTION_START, ARG_HELP_ACTION_START},
@@ -34,6 +48,7 @@ static const struct arg_handler handlers[] = {
     {ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, arg_port},
     {ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, arg_host},
     {ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, arg_devices},
+    {ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, arg_filter},
     {ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, arg_help},
     {ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, arg_debug},
     {ARG_SUBACTION_PAUSE, ARG_SUBACTION_PAUSE, arg_daemon},
@@ -146,6 +161,7 @@ err:
     DEBUG_LOG("");
     return -1;
 }
+
 int arg_host(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_HOST);
@@ -160,6 +176,7 @@ err:
     DEBUG_LOG("");
     return -1;
 }
+
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_DEVICES);
@@ -182,6 +199,39 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     }
 end:
     ctx->devices.info.provided = true;
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
+int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx) {
+    if (*i + 1 >= argc)
+        EARG_MISSING_VALUE(ARG_FLAG_FILTER);
+    if (ctx->filter.info.optional == false)
+        EARG_WRONG_FLAG(ARG_FLAG_FILTER);
+    if (ctx->filter.info.provided == true)
+        EARG_FLAG_AGAIN(ARG_FLAG_FILTER);
+    (*i)++;
+    const int max_filter = *i + filter_length;
+    for (; *i < argc; (*i)++) {
+        char* arg = argv[*i];
+        for (int fi = 0; fi < handlers_length; fi++) {
+            if (strcmp(handlers[fi].flag, arg) == 0 || strcmp(handlers[fi].flag_long, arg) == 0) {
+                (*i)--;
+                goto end;
+            }
+        }
+        if (*i > max_filter)
+            EARG_INVALID(arg, ARG_FLAG_FILTER);
+        for (int fi = 0; fi < filter_length; fi++) {
+            if (strcmp(filter_str[fi], arg) == 0) {
+                ctx->filter.val.filter |= filter_val[fi];
+            }
+        }
+    }
+end:
+    ctx->filter.info.optional = true;
     return 0;
 err:
     DEBUG_LOG("");

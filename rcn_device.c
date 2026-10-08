@@ -51,7 +51,7 @@ err:
     return -1;
 }
 
-int dev_get_all_devices(device_name_arr* devices) {
+int dev_get_all_devices(device_name_arr* devices, enum filter_type filter) {
     DIR* dir = TRY(opendir(RCN_DEV_EVENT_PATH), NULL);
     errno = 0;
     const size_t input_path_len = strlen(RCN_DEV_EVENT_PATH);
@@ -69,10 +69,18 @@ int dev_get_all_devices(device_name_arr* devices) {
         const int dev_fd = TRY(open(dev_path, O_RDONLY), -1);
         uint8_t evt_bits[MAX_EVT_BYTES] = {};
         CHECK(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evt_bits)), evt_bits) == -1);
-//         const bool has_key = HAS_BIT(evt_bits, EV_KEY);
-//         const bool has_rel = HAS_BIT(evt_bits, EV_REL);
-//         const bool has_abs = HAS_BIT(evt_bits, EV_ABS);
-//         const bool has_swt = HAS_BIT(evt_bits, EV_SW);
+        const bool has_key = HAS_BIT(evt_bits, EV_KEY);
+        const bool has_rel = HAS_BIT(evt_bits, EV_REL);
+        const bool has_abs = HAS_BIT(evt_bits, EV_ABS);
+        const bool has_swt = HAS_BIT(evt_bits, EV_SW);
+        if (filter & FILTER_EVT_KEY && !has_key)
+            continue;
+        if (filter & FILTER_EVT_REL && !has_rel)
+            continue;
+        if (filter & FILTER_EVT_ABS && !has_abs)
+            continue;
+        if (filter & FILTER_EVT_SWT && !has_swt)
+            continue;
         char name_buff[devices->r.size] = {};
         CHECK(ioctl(dev_fd, EVIOCGNAME(sizeof(name_buff)), name_buff) == -1);
         CHECK(u_array_add(&devices->r, name_buff) == -1);
