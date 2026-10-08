@@ -5,13 +5,13 @@
 #include <string.h>
 
 static char* subactions[SUBACTION_COUNT] = {
-    [SUBACTION_PAUSE] =  ARG_SUBACTION_PAUSE,
-    [SUBACTION_RESUME] = ARG_SUBACTION_RESUME,
-    [SUBACTION_STOP] = ARG_SUBACTION_STOP,
-    [SUBACTION_SWITCH] = ARG_SUBACTION_SWITCH,
-    [SUBACTION_LOG] = ARG_SUBACTION_LOG,
-    [SUBACTION_LIST] = ARG_SUBACTION_LIST,
-    [SUBACTION_LS] = ARG_SUBACTION_LS,
+    [SUBACTION_PAUSE]   = ARG_SUBACTION_PAUSE,
+    [SUBACTION_RESUME]  = ARG_SUBACTION_RESUME,
+    [SUBACTION_STOP]    = ARG_SUBACTION_STOP,
+    [SUBACTION_SWITCH]  = ARG_SUBACTION_SWITCH,
+    [SUBACTION_LOG]     = ARG_SUBACTION_LOG,
+    [SUBACTION_LIST]    = ARG_SUBACTION_LIST,
+    [SUBACTION_LS]      = ARG_SUBACTION_LS,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
 
@@ -20,6 +20,7 @@ static const struct arg_help_data help_data[] = {
     {ARG_ACTION_CONNECT, ARG_HELP_ACTION_CONNECT},
     {ARG_ACTION_SERVER, ARG_HELP_ACTION_SERVER},
     {ARG_ACTION_CLIENT, ARG_HELP_ACTION_CLIENT},
+    {ARG_ACTION_SHOW, ARG_HELP_ACTION_SHOW},
     {ARG_SUBACTION_PAUSE, ARG_HELP_SUBACTION_PAUSE},
     {ARG_SUBACTION_RESUME, ARG_HELP_SUBACTION_RESUME},
     {ARG_SUBACTION_STOP, ARG_HELP_SUBACTION_STOP},
@@ -34,6 +35,7 @@ static const struct arg_handler handlers[] = {
     {ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, arg_port},
     {ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, arg_host},
     {ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, arg_devices},
+    {ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, arg_filter},
     {ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, arg_help},
     {ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, arg_debug},
     {ARG_SUBACTION_PAUSE, ARG_SUBACTION_PAUSE, arg_daemon},
@@ -57,6 +59,7 @@ static void print_help() {
     printf("\n\t%s: %s", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
     printf("\n\t%s: %s", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
     printf("\n\t%s: %s", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
+    printf("\n\t%s: %s", ARG_ACTION_SHOW, ARG_DESC_ACTION_SHOW);
     printf("\n\n");
 
     printf("Possible subaction are:");
@@ -80,6 +83,10 @@ static void print_help() {
     printf("\n\t%s/%s: %s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
     printf("\tAvailable for action:\n");
     printf("\t\t%s", ARG_ACTION_CONNECT);
+
+    printf("\n\t%s/%s: %s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
+    printf("\tAvailable for action:\n");
+    printf("\t\t%s", ARG_ACTION_SHOW);
 
     printf("\n\t%s/%s: %s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
     printf("\tPossible values are:\n");
@@ -145,6 +152,7 @@ err:
     DEBUG_LOG("");
     return -1;
 }
+
 int arg_host(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_HOST);
@@ -159,6 +167,7 @@ err:
     DEBUG_LOG("");
     return -1;
 }
+
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_DEVICES);
@@ -181,6 +190,43 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     }
 end:
     ctx->devices.info.provided = true;
+    return 0;
+err:
+    DEBUG_LOG("");
+    return -1;
+}
+
+int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx) {
+    if (*i + 1 >= argc)
+        EARG_MISSING_VALUE(ARG_FLAG_FILTER);
+    if (ctx->filter.info.optional == false)
+        EARG_WRONG_FLAG(ARG_FLAG_FILTER);
+    if (ctx->filter.info.provided == true)
+        EARG_FLAG_AGAIN(ARG_FLAG_FILTER);
+    (*i)++;
+    const int max_filter = *i + device_evt_str_length;
+    for (; *i < argc; (*i)++) {
+        char* arg = argv[*i];
+        for (int fi = 0; fi < handlers_length; fi++) {
+            if (strcmp(handlers[fi].flag, arg) == 0 || strcmp(handlers[fi].flag_long, arg) == 0) {
+                (*i)--;
+                goto end;
+            }
+        }
+        if (*i >= max_filter)
+            EARG_OVERFLOW(ARG_FLAG_FILTER, DEVICE_EVT_COUNT_INDEX);
+        bool found_evt = false;
+        for (int fi = 0; fi < device_evt_str_length; fi++) {
+            if (strcasecmp(device_evt_str_arr[fi], arg) == 0) {
+                ctx->filter.val.filter |= device_evt_val_arr[fi];
+                found_evt = true;
+            }
+        }
+        if (found_evt == false)
+            EARG_UNKNOWN("filter", arg);
+    }
+end:
+    ctx->filter.info.optional = true;
     return 0;
 err:
     DEBUG_LOG("");

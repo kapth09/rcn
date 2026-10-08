@@ -19,6 +19,13 @@
 struct d_context;
 struct peer_msg_event;
 struct peer_context;
+enum event_types;
+
+struct basic_device_info {
+    char name[RCN_DEV_MAX_NAME_LEN];
+    char eventX[RCN_DEV_MAX_NAME_LEN];
+    enum event_types events;
+};
 
 struct device_info {
     uint8_t evtbit[MAX_EVT_BYTES];
@@ -47,9 +54,20 @@ enum device_ctrl {
     DEV_CTRL_RELEASE,
 };
 
+#define DEVICE_EVT_KEY_STR      "KEY"
+#define DEVICE_EVT_REL_STR      "REL"
+#define DEVICE_EVT_ABS_STR      "ABS"
+#define DEVICE_EVT_SWT_STR      "SWT"
+
+extern const int device_evt_val_arr[];
+extern const char* device_evt_str_arr[DEVICE_EVT_COUNT_INDEX];
+extern const int device_evt_str_length;
+
 int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
 int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev);
 int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type);
+int dev_get_all_devices(basic_dev_info_arr* dev_binfos, enum event_types filter);
+int dev_print_basic_info(struct basic_device_info binfo);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_get_device_info(int dev_fd, struct device* dev);

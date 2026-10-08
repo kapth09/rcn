@@ -67,7 +67,9 @@ extern enum debug_level g_debug_level;
 #define RCN_CLIENT_USOCKET_PATH RCN_DAEMON_DIR_PATH "client.sock"
 #define RCN_CLIENT_USOCKET_LEN sizeof(RCN_CLIENT_USOCKET_PATH)
 #define RCN_STD_CAPACITY 10
-#define RCN_DEV_MAX_NAME_LEN 255
+#define RCN_DEV_MAX_NAME_LEN 256
+
+#define RCN_DEV_EVENT_PATH "/dev/input"
 
 #define RCN_PROC_NAME_SERVER "rcn_server"
 #define RCN_PROC_NAME_CLIENT "rcn_client"

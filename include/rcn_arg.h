@@ -1,10 +1,13 @@
 #ifndef RCN_RCN_ARG_H
 #define RCN_RCN_ARG_H
 
+#include "rcn_device.h"
+
 #define ARG_ACTION_START 	"start"
 #define ARG_ACTION_CONNECT 	"connect"
 #define ARG_ACTION_SERVER   "server"
 #define ARG_ACTION_CLIENT   "client"
+#define ARG_ACTION_SHOW     "show"
 
 #define ARG_SUBACTION_PAUSE 	"pause"
 #define ARG_SUBACTION_RESUME 	"resume"
@@ -18,6 +21,7 @@
 #define ARG_DESC_ACTION_CONNECT     "Connect to the given server and capture the list of devices"
 #define ARG_DESC_ACTION_SERVER      "Interact with the server daemon via subactions"
 #define ARG_DESC_ACTION_CLIENT      "Interact with the client daemon via subactions"
+#define ARG_DESC_ACTION_SHOW        "Show all available devices for capture"
 
 #define ARG_DESC_SUBACTION_PAUSE   "Pause the capturing of the devices"
 #define ARG_DESC_SUBACTION_RESUME  "Resume the capturing of the devices"
@@ -36,24 +40,38 @@
 #define ARG_FLAG_LONG_HELP      "--help"
 #define ARG_FLAG_DEBUG          "-g"
 #define ARG_FLAG_LONG_DEBUG     "--debug"
+#define ARG_FLAG_FILTER         "-f"
+#define ARG_FLAG_LONG_FILTER    "--filter"
 
-#define ARG_DESC_FLAG_PORT       "Port on which to listen on/connect to"
-#define ARG_DESC_FLAG_HOST       "Hostname/ip-address of the server"
-#define ARG_DESC_FLAG_DEVICES    "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
-#define ARG_DESC_FLAG_HELP       "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
-#define ARG_DESC_FLAG_DEBUG      "Print extra debug information in the log, should be the first argument"
+#define ARG_FILTER_EVT_KEY      DEVICE_EVT_KEY_STR
+#define ARG_FILTER_EVT_REL      DEVICE_EVT_REL_STR
+#define ARG_FILTER_EVT_ABS      DEVICE_EVT_ABS_STR
+#define ARG_FILTER_EVT_SWT      DEVICE_EVT_SWT_STR
+
+#define ARG_DESC_FLAG_PORT      "Port on which to listen on/connect to"
+#define ARG_DESC_FLAG_HOST      "Hostname/ip-address of the server"
+#define ARG_DESC_FLAG_DEVICES   "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
+#define ARG_DESC_FLAG_HELP      "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
+#define ARG_DESC_FLAG_DEBUG     "Print extra debug information in the log, should be the first argument"
+#define ARG_DESC_FLAG_FILTER    "Filter devices by event type"
 
 #define ARG_HELP_ACTION_START   "Usage: rcn start -p <port>\n\t" \
                                 "Starts the server in the background, listening on the given port (-p/--port).\n\t" \
                                 "Then, the client can run 'rcn connect ...' and transmit their captures devices.\n\t" \
                                 "Every device specified in the 'rcn connect' command is recreated on the server and inputs are replayed."
-#define ARG_HELP_ACTION_CONNECT "Usage: rcn connect -p <port> -s <server addr.> -d </path/to/dev> ...\n\t"\
+#define ARG_HELP_ACTION_CONNECT "Usage: rcn connect -p <port> -s <server addr.> -d </path/to/dev> ...\n\t" \
                                 "Connect to an already started rcn server on the given port (-p/--port).\n\t" \
                                 "The server is specified with the '-s'/'--server' flag, which can either be an IPv4 address or the hostname.\n\t"\
-                                "Every listed device/event-file is captured and copied to the server.\n\t"\
+                                "Every listed device/event-file is captured and copied to the server.\n\t" \
                                 "When the client is actively running, input events are sent to the server."
 #define ARG_HELP_ACTION_SERVER  "Interact with the server background process via subactions."
 #define ARG_HELP_ACTION_CLIENT  "Interact with the client background process via subactions."
+#define ARG_HELP_ACTION_SHOW    "List every device's full name, path and event type.\n\t" \
+                                "The -f/--filter flag filters the devices by their event type.\n\t" \
+                                "A device can have multiple types.\n\t" \
+                                "The device driver/firmware can report more event types than the device actually has.\n\t" \
+                                "Possible filters are:\n\t" \
+                                "\tkey/KEY (keyboards), rel/REL (mice), abs/ABS (touchpads), swt/SWT (binary switches)"
 
 #define ARG_HELP_SUBACTION_PAUSE    "The client ungrabs the devices and no input data is sent to the server."
 #define ARG_HELP_SUBACTION_RESUME   "The client regrabs the devices and input data is sent to the server."
@@ -85,13 +103,15 @@ enum subaction_type {
 };
 
 struct arg_info {
+    bool optional;
     bool needed;
     bool provided;
 };
 
 union arg_data {
-    int v_int;
     enum subaction_type saction;
+    enum event_types filter;
+    int v_int;
     char* v_char;
     char_arr v_char_arr;
 };
@@ -107,6 +127,7 @@ struct arg_context {
     struct arg devices;
     struct arg help;
     struct arg daemon;
+    struct arg filter;
     enum debug_level* g_debug_level_ptr;
 };
 
@@ -125,6 +146,12 @@ struct arg_help_data {
     fprintf(stderr, "err: invalid value '%s' for '%s'\n",   \
         value, type);                                       \
     goto err;                                               \
+})
+
+#define EARG_OVERFLOW(type, max) ({                                     \
+    fprintf(stderr, "err: to many values for flag '%s (max: %d)'\n",    \
+        type, max);                                                     \
+    goto err;                                                           \
 })
 
 #define EARG_UNKNOWN(type, value) ({            \
@@ -174,6 +201,7 @@ struct arg_handler {
 int arg_port(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_host(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx);
+int arg_filter(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_help(int argc, char** argv, int* i, struct arg_context* ctx);
 int arg_debug(int argc, char** argv, int* i, struct arg_context* ctx);
