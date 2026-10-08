@@ -15,8 +15,6 @@
 #define MAX_REL_BYTES   ((REL_MAX+7) / 8)
 #define MAX_PROP_BYTES  ((INPUT_PROP_MAX+7) / 8)
 
-#define DEV_EVENT_FILE_LEN 16
-
 /* forward declarations */
 struct d_context;
 struct peer_msg_event;
