@@ -50,51 +50,47 @@ static const int handlers_length = sizeof(handlers) / sizeof(handlers[0]);
 static void print_help() {
     printf("Usage: rcn <action> <flag> <value> ...\n\n");
 
-    printf("Description:");
-    printf("\n\t%s", ARG_HELP_RCN_DESC);
+    printf("Actions:");
+    printf("\n\t%s\t\t%s", ARG_ACTION_START, ARG_DESC_ACTION_START);
+    printf("\n\t%s\t\t%s", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
+    printf("\n\t%s\t\t%s", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
+    printf("\n\t%s\t\t%s", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
+    printf("\n\t%s\t\t%s", ARG_ACTION_SHOW, ARG_DESC_ACTION_SHOW);
     printf("\n\n");
 
-    printf("Possible actions are:");
-    printf("\n\t%s: %s", ARG_ACTION_START, ARG_DESC_ACTION_START);
-    printf("\n\t%s: %s", ARG_ACTION_CONNECT, ARG_DESC_ACTION_CONNECT);
-    printf("\n\t%s: %s", ARG_ACTION_SERVER, ARG_DESC_ACTION_SERVER);
-    printf("\n\t%s: %s", ARG_ACTION_CLIENT, ARG_DESC_ACTION_CLIENT);
-    printf("\n\t%s: %s", ARG_ACTION_SHOW, ARG_DESC_ACTION_SHOW);
+    printf("Subactions:");
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_PAUSE, ARG_DESC_SUBACTION_PAUSE);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_SWITCH, ARG_DESC_SUBACTION_SWITCH);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
     printf("\n\n");
 
-    printf("Possible subaction are:");
-    printf("\n\t%s: %s", ARG_SUBACTION_PAUSE, ARG_DESC_SUBACTION_PAUSE);
-    printf("\n\t%s: %s", ARG_SUBACTION_RESUME, ARG_DESC_SUBACTION_RESUME);
-    printf("\n\t%s: %s", ARG_SUBACTION_STOP, ARG_DESC_SUBACTION_STOP);
-    printf("\n\t%s: %s", ARG_SUBACTION_SWITCH, ARG_DESC_SUBACTION_SWITCH);
-    printf("\n\t%s: %s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
-    printf("\n\t%s: %s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
-    printf("\n\n");
+    printf("Flags:\n");
+    printf("\t%s/%s\t%s\n", ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, ARG_DESC_FLAG_PORT);
+    printf("\t\t\tAvailable for actions:\n");
+    printf("\t\t\t\t%s, %s", ARG_ACTION_START, ARG_ACTION_CONNECT);
 
-    printf("Possible flags are:\n");
-    printf("\t%s/%s: %s\n", ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, ARG_DESC_FLAG_PORT);
-    printf("\tAvailable for actions:\n");
-    printf("\t\t%s, %s", ARG_ACTION_START, ARG_ACTION_CONNECT);
+    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
+    printf("\t\t\tAvailable for action:\n");
+    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
 
-    printf("\n\t%s/%s: %s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
-    printf("\tAvailable for action:\n");
-    printf("\t\t%s", ARG_ACTION_CONNECT);
+    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
+    printf("\t\t\tAvailable for action:\n");
+    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
 
-    printf("\n\t%s/%s: %s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
-    printf("\tAvailable for action:\n");
-    printf("\t\t%s", ARG_ACTION_CONNECT);
+    printf("\n\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
+    printf("\t\t\tAvailable for action:\n");
+    printf("\t\t\t\t%s", ARG_ACTION_SHOW);
 
-    printf("\n\t%s/%s: %s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
-    printf("\tAvailable for action:\n");
-    printf("\t\t%s", ARG_ACTION_SHOW);
+    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
+    printf("\t\t\tPossible values are:\n");
+    printf("\t\t\t\t<(sub)action>");
 
-    printf("\n\t%s/%s: %s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
-    printf("\tPossible values are:\n");
-    printf("\t\t<(sub)action>");
-
-    printf("\n\t%s/%s: %s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
-    printf("\tAvailability:\n");
-    printf("\t\tAlways");
+    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
+    printf("\t\t\tAvailability:\n");
+    printf("\t\t\t\tAlways");
     printf("\n");
 }
 
