@@ -1,11 +1,11 @@
 Name: 		rcn
-Version: 	0.0.1
+Version: 	0.0.2
 Release:        %autorelease
 Summary: 	Remote control program for linux
 
 License: 	GPLv3
 URL: 		https://github.com/kapth09/rcn
-Source0: 	rcn-0.0.1.tar.gz
+Source0: 	rcn-0.0.2.tar.gz
 
 BuildRequires: 	gcc, make
 

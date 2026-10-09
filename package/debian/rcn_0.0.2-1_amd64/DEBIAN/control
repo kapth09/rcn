@@ -1,0 +1,9 @@
+Package: rcn
+Version: 0.0.2-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: kapth09
+Depends: libc6 (>= 2.34)
+Description: Remote control program for linux
+ A remote control program to replay eventX inputs on another computer.
