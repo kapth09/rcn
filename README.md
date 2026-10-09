@@ -1,6 +1,47 @@
 # RCN
 
+Table of Contents
+
+- [About](#about)
+- [Tested devices](#tested-devices)
+- [Install](#install)
+    - [Using a package manager](#using-a-package-manager)
+    - [Using Make](#using-make)
+- [Uninstall](#uninstall)
+    - [Installed via package](#installed-via-package)
+    - [Installed via Make](#installed-via-make)
+- [Usage](#usage)
+    - [Actions](#actions)
+      - [Start](#start)
+      - [Connect](#connect)
+      - [Show](#show)
+    - [Subactions](#subactions)
+      - [Pause](#pause)
+      - [Resume](#resume)
+      - [Stop](#stop)
+      - [Log](#log)
+      - [List / ls](#list--ls)
+
+
+## About
+
 A remote control program for Linux to read input data from `eventX` files of the `client` and replay them on the `server`.
+
+> [!WARNING]
+>
+> All network traffic is unencrypted and somebody could be spying on your inputs.  
+> This includes keystrokes, making it possible to capture your password.
+
+## Tested devices
+
+A list of every tested device and proven to work:
+- Keychron K3 Max
+- Roccat Kone Aimo 16K
+- Chicony USB-Keyboard
+- Nintendo Switch 1 Pro-Controller
+- Acer Nitro 5 Laptop
+    - Keyboard
+    - Touchpad
 
 ## Install
 
@@ -50,7 +91,27 @@ make uninstall
 >
 > This program reads from `/dev/input/eventX` files and writes to `/dev/uinput`, which require special permissions. For some Distros, like Fedora, it's enough to be a member of the `input` group. Other Distros, like Debian, are stricter and require super-user privileges.
 
-#### Start
+This program's CLI is split into `actions` and `subactions`.  
+Actions are general commands, for example to start the program.  
+Subactions are commands which need a target. The target is either `client` or `server`.
+
+```bash
+# action without target
+rcn <action> ...
+# subaction with target
+rcn client/server <subaction> ...
+```
+
+This divide exists because the program runs in the background as a `daemon`.   
+A computer can be both a `client` and a `server`, so there must be a way to destinguish between them.
+
+However, subaction can ommitt the `target` and the program automatically checks which daemon is running.  
+If both `client` and `server` are running, it defaults to the `client`.
+
+
+#### Actions
+
+##### Start
 
 To start the serve on the given port (`-p/--port`) and listen for a  client to connect and replay input data. 
 
@@ -58,13 +119,58 @@ To start the serve on the given port (`-p/--port`) and listen for a  client to c
 rcn start -p <port>
 ```
 
-#### Connect
+##### Connect
 
 Connect to the specified server (`-s/--server`) on the given port (`-p/--port`). `-d/--devices` accepts one or more absolute paths to  `eventX` files. The program grabs the devices, so their input isn't captured on the client.
 
 ```bash
 rcn connect -p <port> -s <server-address> -d </dev/input/eventX> ...
 ```
+
+To find available devices, use the `show` action or view the symlinks in `/dev/input/by-id` and `/dev/input/by-path`.
+
+##### Show
+
+Prints for every `/dev/input/eventX` file, the full name of the device, the event capabilites (`EV_KEY`, `EV_REl`, `EV_ABS`, `EV_SW`) and the specific eventX file-name.
+
+```bash
+rcn show
+```
+
+Output:
+
+|Type           |eventX |Full device name                          |
+|---------------|-------|------------------------------------------|
+|[KEY] 	        |event2 |Power Button                              |
+|[KEY, REL, ABS]|event11|Keychron  Keychron Link  Keyboard         |   
+|[KEY, REL]     |event3 |ROCCAT ROCCAT Kone Aimo 16K Mouse         |
+
+> [!NOTE]
+>
+> The driver/firmware of the device can report more event types than the real physical device actually has. This may lead to confusing output such as a normal keyboard having `KEY`, `REL` and `ABS` as a event types.
+
+This action also supports the `-f/--filter` flag. 
+This lets you filter out any device which doesn't have at least all the specified event types.
+
+Possible filters are:
+- **key** (The device has buttons, like a keyboard)
+- **rel** (The device has relative movement, like a mouse)
+- **abs** (The device has absolute positions, like a touchpad)
+- **swt** (The device has binary switches, like a laptop lid)
+
+The case of the filter is ignored, so `KEY` and `kEy` are the same as `key`.
+
+So with this command:
+
+```bash
+rcn show --filter rel abs
+```
+
+The list above gets filtered as:
+
+|Type           |eventX |Full device name                          |
+|---------------|-------|------------------------------------------|
+|[KEY, REL, ABS]|event11|Keychron  Keychron Link  Keyboard         |   
 
 #### Subactions
 
@@ -75,7 +181,7 @@ rcn server <subaction>
 rcn client <subaction>
 ```
 
-If `server`/`client` is omitted, it checks which daemon is running and sends the `subaction` to it. It defaults to `client` if both server and client are running.
+If `server`/`client` is omitted, the program checks which daemon is running and sends the `subaction` to it. It defaults to `client` if both server and client are running.
 
 ##### Pause
 
@@ -115,5 +221,14 @@ rcn log
 rcn server log
 ```
 
+##### List / ls
 
+List all captured devices and their status, grabbed or ungrabbed. Should print the same for both `client` and `server`. `ls` is a alias for `list` and does the same thing.
 
+```bash
+rcn list
+```
+
+```bash
+rcn ls
+```
