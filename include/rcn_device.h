@@ -36,7 +36,7 @@ struct device_info {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
-    size_t random_id;
+    uint16_t random_id;
 };
 
 struct device {

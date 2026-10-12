@@ -125,12 +125,12 @@ static int request_list(struct stream_item* item) {
     list.r.capacity = list.r.size * list.r.length;
     for (size_t i = 0; i < list.r.length; i++) {
         struct relay_data_list* list_entry = {};
-        CHECK(u_array_getr(&list.r, (void**)&list_entry, i++) == -1);
-        printf("\rrcn: %s ", list_entry->dev_name);
+        CHECK(u_array_getr(&list.r, (void**)&list_entry, i) == -1);
+        printf("\rrcn:\t%d\t'%s'", list_entry->random_id, list_entry->dev_name);
         if (list_entry->grabbed)
-            printf("[grabbed]\n");
+            printf("\t[grabbed]\n");
         else
-            printf("[ungrabbed]\n");
+            printf("\t[ungrabbed]\n");
     }
     return 0;
 err:
@@ -299,6 +299,7 @@ static int handler_list(struct d_context* d_ctx, struct epoll_stream* stream, st
         CHECK(u_array_getr(&devices->r, (void**)&device, i) == -1);
         struct relay_data_list list_entry = {};
         list_entry.grabbed = device->grabbed;
+        list_entry.random_id = device->info.random_id;
         memcpy(list_entry.dev_name, device->info.name, UINPUT_MAX_NAME_SIZE);
         CHECK(u_array_add(&list.r, &list_entry) == -1);
     }

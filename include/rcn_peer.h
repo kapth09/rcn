@@ -19,17 +19,17 @@ struct peer_msg_dev_crt {
 };
 
 struct peer_msg_dev_del {
-    size_t random_id;
+    uint16_t random_id;
 };
 
 struct peer_msg_dev_upd_grab {
-    size_t random_id;
+    uint16_t random_id;
     bool grab;
 };
 
 struct peer_msg_event {
     struct input_event evt_data;
-    size_t random_id;
+    uint16_t random_id;
 };
 
 enum peer_state {

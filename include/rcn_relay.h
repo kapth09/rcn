@@ -28,6 +28,7 @@ struct relay_msg {
 
 struct relay_data_list {
     char dev_name[UINPUT_MAX_NAME_SIZE];
+    uint16_t random_id;
     bool grabbed;
 };
 
