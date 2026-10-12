@@ -99,11 +99,16 @@ static int check_daemon_status(int eventfd) {
     fflush(stdout);
     CHECK(poll(&fds, 1, 5000) == -1);
     read(eventfd, &status, sizeof(status));
-    CHECK(status != DAEMON_STATUS_OK);
+    if (status != DAEMON_STATUS_OK)
+        goto daemon_err;
     return 0;
-err:
-    fprintf(stderr, "\rerr: cannot start daemon [%s]\n", strerror(status));
+daemon_err:
+    if (status == 0)
+        status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
+    fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
     fflush(stderr);
+    return -1;
+err:
     ERR_LOG("");
     return -1;
 }
