@@ -12,6 +12,9 @@ static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_LOG]     = ARG_SUBACTION_LOG,
     [SUBACTION_LIST]    = ARG_SUBACTION_LIST,
     [SUBACTION_LS]      = ARG_SUBACTION_LS,
+    [SUBACTION_ADD]     = ARG_SUBACTION_ADD,
+    [SUBACTION_RM]      = ARG_SUBACTION_RM,
+    [SUBACTION_MOD]     = ARG_SUBACTION_MOD,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
 
@@ -28,6 +31,9 @@ static const struct arg_help_data help_data[] = {
     {ARG_SUBACTION_LOG, ARG_HELP_SUBACTION_LOG},
     {ARG_SUBACTION_LIST, ARG_HELP_SUBACTION_LIST},
     {ARG_SUBACTION_LS, ARG_HELP_SUBACTION_LIST},
+    {ARG_SUBACTION_ADD, ARG_HELP_SUBACTION_ADD},
+    {ARG_SUBACTION_RM, ARG_HELP_SUBACTION_RM},
+    {ARG_SUBACTION_MOD, ARG_HELP_SUBACTION_MOD},
 };
 static const int help_data_length = sizeof(help_data) / sizeof(help_data[0]);
 
@@ -44,6 +50,9 @@ static const struct arg_handler handlers[] = {
     {ARG_SUBACTION_SWITCH, ARG_SUBACTION_SWITCH, arg_daemon},
     {ARG_SUBACTION_LOG, ARG_SUBACTION_LOG, arg_daemon},
     {ARG_SUBACTION_LS, ARG_SUBACTION_LIST, arg_daemon},
+    {ARG_SUBACTION_ADD, ARG_SUBACTION_ADD, arg_daemon},
+    {ARG_SUBACTION_RM, ARG_SUBACTION_RM, arg_daemon},
+    {ARG_SUBACTION_MOD, ARG_SUBACTION_MOD, arg_daemon},
 };
 static const int handlers_length = sizeof(handlers) / sizeof(handlers[0]);
 
@@ -167,7 +176,7 @@ err:
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_DEVICES);
-    if (ctx->devices.info.needed == false)
+    if (ctx->devices.info.needed == false && ctx->devices.info.optional == false)
         EARG_WRONG_FLAG(ARG_FLAG_DEVICES);
     if (ctx->devices.info.provided == true)
         EARG_FLAG_AGAIN(ARG_FLAG_DEVICES);
@@ -230,24 +239,23 @@ err:
 }
 
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx) {
+    (void)argc;
     if (ctx->daemon.info.needed == false)
         EARG_WRONG_SUBACTION(argv[*i]);
     if (ctx->daemon.info.provided == true)
         EARG_SUBACTION_AGAIN(argv[*i]);
-    for (; *i < argc; (*i)++) {
-        const char* arg = argv[*i];
-        bool found_subaction = false;
-        for (int j = 0; j < subactions_length; j++) {
-            if (strcmp(arg, subactions[j]) == 0) {
-                ctx->daemon.val.saction = j;
-                found_subaction = true;
-                break;
-            }
+    const char* arg = argv[*i];
+    bool found_subaction = false;
+    for (int j = 0; j < subactions_length; j++) {
+        if (strcmp(arg, subactions[j]) == 0) {
+            ctx->daemon.val.saction = j;
+            found_subaction = true;
+            break;
         }
-        if (found_subaction == false) {
-            ERR_LOG("unkown subaction '%s'", arg);
-            goto err;
-        }
+    }
+    if (found_subaction == false) {
+        ERR_LOG("unkown subaction '%s'", arg);
+        goto err;
     }
     ctx->daemon.info.provided = true;
     return 0;
@@ -317,6 +325,9 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_LIST: return RELAY_HEADER_LIST;
         case SUBACTION_LS: return RELAY_HEADER_LIST;
         case SUBACTION_SWITCH: return RELAY_HEADER_SWITCH;
+        case SUBACTION_ADD: printf("add\n"); return 0;
+        case SUBACTION_RM: printf("rm\n"); return 0;
+        case SUBACTION_MOD: printf("mod\n"); return 0;
         default:
             DEBUG_LOG("");
             return -1;

@@ -16,6 +16,9 @@
 #define ARG_SUBACTION_LOG       "log"
 #define ARG_SUBACTION_LIST      "list"
 #define ARG_SUBACTION_LS        "ls"
+#define ARG_SUBACTION_ADD       "add"
+#define ARG_SUBACTION_RM        "rm"
+#define ARG_SUBACTION_MOD       "mod"
 
 #define ARG_DESC_ACTION_START       "Start the server, on the given port, in the background"
 #define ARG_DESC_ACTION_CONNECT     "Connect to the given server and capture the list of devices"
@@ -29,6 +32,9 @@
 #define ARG_DESC_SUBACTION_SWITCH  "Switch betwen paused/running state"
 #define ARG_DESC_SUBACTION_LOG     "Print the logs to stdout"
 #define ARG_DESC_SUBACTION_LIST    "List captured devices"
+#define ARG_DESC_SUBACTION_ADD     "Add listed devices to the rcn context"
+#define ARG_DESC_SUBACTION_RM      "Remove listed devices by id from the rcn context"
+#define ARG_DESC_SUBACTION_MOD     "Modify the grab state of the listed devices by id"
 
 #define ARG_FLAG_PORT 	        "-p"
 #define ARG_FLAG_LONG_PORT      "--port"
@@ -83,6 +89,10 @@
 #define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
                                     "If --debug is set, more info is available."
 #define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not. 'list' and 'ls' are the equivalent."
+#define ARG_HELP_SUBACTION_ADD      "Add the listed devices to the rcn context. The devices are instantly grabbed and inputs are streamed.\n\t" \
+                                    "The listed devices must be plugged into the client."
+#define ARG_HELP_SUBACTION_RM       "Remove all the listed from the rcn context. They are no longer captured."
+#define ARG_HELP_SUBACTION_MOD      "<TODO>."
 
 #define ARG_HELP_RCN_DESC   "rcn is a tool to send inputs from eventX files and replay them on the server via a uinput virtual device.\n\t" \
                             "The server is started via 'start', the client connects via 'connect'\n\t" \
@@ -99,7 +109,20 @@ enum subaction_type {
     SUBACTION_LOG,
     SUBACTION_LIST,
     SUBACTION_LS,
+    SUBACTION_ADD,
+    SUBACTION_RM,
+    SUBACTION_MOD,
     SUBACTION_COUNT,
+};
+
+union subaction_value {
+    uint16_arr dev_id_arr;
+    char_arr dev_name_arr;
+};
+
+struct subaction {
+    enum subaction_type type;
+    union subaction_value value;
 };
 
 struct arg_info {

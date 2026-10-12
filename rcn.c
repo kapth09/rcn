@@ -101,36 +101,6 @@ err:
     return -1;
 }
 
-static int action_server(int argc, char** argv) {
-    if (argc < 3)
-        EARG_COUNT(ARG_ACTION_SERVER, 3, argc);
-    arg_ctx.daemon.info.needed = true;
-    CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
-    if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
-        CHECK(d_print_log(DAEMON_SERVER) == -1);
-    else
-        CHECK(subaction_daemon(DAEMON_SERVER, arg_ctx.daemon.val.saction) == -1);
-    return 0;
-err:
-    DEBUG_LOG("");
-    return -1;
-}
-
-static int action_client(int argc, char** argv) {
-    if (argc < 3)
-        EARG_COUNT(ARG_ACTION_SERVER, 3, argc);
-    arg_ctx.daemon.info.needed = true;
-    CHECK(parse_args(argc, argv, 2, &arg_ctx) == -1);
-    if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
-        CHECK(d_print_log(DAEMON_CLIENT) == -1);
-    else
-        CHECK(subaction_daemon(DAEMON_CLIENT, arg_ctx.daemon.val.saction) == -1);
-    return 0;
-err:
-    DEBUG_LOG("");
-    return -1;
-}
-
 static int action_show(int argc, char** argv) {
     arg_ctx.filter.info.optional = true;
     if (argc > 2)
@@ -151,21 +121,29 @@ err:
     return -1;
 }
 
-static int auto_subaction(int argc, char** argv) {
-    arg_ctx.daemon.info.needed = true;
-    CHECK(parse_args(argc, argv, 1, &arg_ctx) == -1);
-    enum daemon_type d_type = DAEMON_CLIENT;
-    if (daemon_is_running(DAEMON_CLIENT) == -1) {
-        d_type = DAEMON_SERVER;
-        if (daemon_is_running(DAEMON_SERVER) == -1) {
-            fprintf(stderr, "err: no daemon running\n");
-            goto err;
+static int action_daemon(int argc, char** argv, enum daemon_type type) {
+    int start_arg = 2;
+    if (type == DAEMON_UNKNOWN) {
+        start_arg = 1;
+        if (daemon_is_running(DAEMON_CLIENT) == 0) {
+            type = DAEMON_CLIENT;
+            goto cont;
         }
+        if (daemon_is_running(DAEMON_SERVER) == 0) {
+            type = DAEMON_SERVER;
+            goto cont;
+        }
+        fprintf(stderr, "err: no daemon running\n");
+        goto err;
     }
+cont:
+    arg_ctx.daemon.info.needed = true;
+    arg_ctx.devices.info.optional = true;
+    CHECK(parse_args(argc, argv, start_arg, &arg_ctx) == -1);
     if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
-        CHECK(d_print_log(d_type) == -1);
+        CHECK(d_print_log(type) == -1);
     else
-        CHECK(subaction_daemon(d_type, arg_ctx.daemon.val.saction) == -1);
+        CHECK(subaction_daemon(type, arg_ctx.daemon.val.saction) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -193,15 +171,15 @@ int main(int argc, char** argv) {
     else if (strcmp(action, ARG_ACTION_CONNECT) == 0)
         CHECK(action_connect(argc, argv) == -1);
     else if (strcmp(action, ARG_ACTION_SERVER) == 0)
-        CHECK(action_server(argc, argv) == -1);
+        CHECK(action_daemon(argc, argv, DAEMON_SERVER) == -1);
     else if (strcmp(action, ARG_ACTION_CLIENT) == 0)
-        CHECK(action_client(argc, argv) == -1);
+        CHECK(action_daemon(argc, argv,DAEMON_CLIENT) == -1);
     else if (strcmp(action, ARG_ACTION_SHOW) == 0)
         CHECK(action_show(argc, argv));
     else if (strcmp(action, ARG_FLAG_HELP) == 0)
         CHECK(help(argc, argv) == -1);
     else
-        CHECK(auto_subaction(argc, argv) == -1);
+        CHECK(action_daemon(argc, argv, DAEMON_UNKNOWN) == -1);
     return 0;
 err:
     fprintf(stderr, "see 'rcn -h' for help\n");
