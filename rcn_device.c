@@ -282,7 +282,7 @@ err:
 
 int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device_info* template) {
     int u_fd = -1;
-    u_fd = TRY(open("/dev/uinput", O_WRONLY | O_NONBLOCK), -1);
+    u_fd = TRY(open(RCN_DEV_UINPUT_PATH, O_WRONLY | O_NONBLOCK), -1);
     struct device* device = TRY(calloc(1, sizeof(struct device)), NULL);
     CHECK(apply_udev_info(u_fd, device, template) == -1);
     CHECK(e_epoll_add_device(ep_ctx, u_fd, device, FD_UDEV) == -1);

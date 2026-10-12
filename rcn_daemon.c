@@ -96,6 +96,19 @@ err:
     return -1;
 }
 
+static int check_permissions(enum daemon_type d_type) {
+    int fd;
+    if (d_type == DAEMON_SERVER)
+        fd = TRY(open(RCN_DEV_UINPUT_PATH, O_WRONLY), -1);
+    else
+        fd = TRY(open(RCN_DEV_EVENT_PATH"/event0", O_RDONLY), -1);
+    close(fd);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static int resolve_host(const int port, const char *host, struct addrinfo** addr) {
     char port_str[6];
     snprintf(port_str, sizeof(port_str), "%d", port);
@@ -281,9 +294,10 @@ static int d_init(struct daemon_arg arg) {
     } else {
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_CLIENT, 0UL, 0UL, 0UL) == -1);
     }
+    CHECK(setsid() == -1);
     CHECK(d_init_dir() == -1);
     CHECK(d_init_log(arg.type) == -1);
-    CHECK(setsid() == -1);
+    CHECK(check_permissions(arg.type) == -1);
 
     struct epoll_context ep_ctx = {};
     struct relay_context relay_ctx = {};
