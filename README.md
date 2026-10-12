@@ -39,10 +39,13 @@ A list of every tested device and proven to work:
 - Roccat Kone Aimo 16K
 - Chicony USB-Keyboard
 - Nintendo Switch 1 Pro-Controller
+- GAOMON S620 Graphics Tablet
 - Acer Nitro 5 Laptop
     - Keyboard
     - Touchpad
-
+- Dell XPS 9440
+    - Keyboard
+  
 ## Install
 
 #### Using a package manager
