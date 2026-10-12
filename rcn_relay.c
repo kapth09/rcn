@@ -104,9 +104,8 @@ static int check_daemon_status(int eventfd) {
     return 0;
 daemon_err:
     if (status == 0)
-        fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(ETIMEDOUT));
-    else
-        fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
+        status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
+    fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
     fflush(stderr);
     return -1;
 err:
