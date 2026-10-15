@@ -340,7 +340,7 @@ static int d_init(struct daemon_arg arg) {
     return 0;
 err:
     int64_t status_err = errno;
-    CHECK(write(arg.evtfd, &status_err, sizeof(status_err)) == -1);
+    write(arg.evtfd, &status_err, sizeof(status_err));  // no CHECK because it would loop infinitely
     ERR_LOG("");
     return -1;
 }

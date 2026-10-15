@@ -1,6 +1,7 @@
 #ifndef RCN_RCN_RELAY_H
 #define RCN_RCN_RELAY_H
 
+#include "rcn_arg.h"
 #include <linux/uinput.h>
 
 #define DEFAULT_USOCK_COUNT 3
@@ -20,10 +21,17 @@ enum relay_msg_header {
     RELAY_HEADER_STOP,
     RELAY_HEADER_SWITCH,
     RELAY_HEADER_LIST,
+    RELAY_HEADER_ADD_DEV,
+    RELAY_HEADER_RM_DEV,
+    RELAY_HEADER_MOD_DEV,
 };
 
 struct relay_msg {
     enum relay_msg_header header;
+};
+
+struct relay_msg_dev_add {
+
 };
 
 struct relay_data_list {
@@ -33,10 +41,11 @@ struct relay_data_list {
 };
 
 struct relay_arg {
+    struct arg devices;
+    int evtfd;
     enum relay_msg_header header_sent;
     enum daemon_type d_type;
     bool check_daemon_status;
-    int evtfd;
 };
 
 struct relay_context {

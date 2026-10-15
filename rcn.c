@@ -29,13 +29,14 @@ static int daemon_is_running(enum daemon_type d_type) {
         }
         char name_buff[128] = {};
         const int length = TRY(read(file, name_buff, sizeof(name_buff)), -1);
+        close(file);
         name_buff[length-1] = '\0';   // remove '\n' from name
-        if (strcmp(name_buff, proc_name) == 0) {
-            close(file);
+        if (strcmp(proc_name, name_buff) == 0) {
             closedir(proc_dir);
             return 0;
         }
     }
+    closedir(proc_dir);
     return -1;
 err:
     DEBUG_LOG("");
@@ -86,7 +87,7 @@ static int action_connect(int argc, char** argv) {
     struct daemon_arg d_arg = {};
     d_arg.port = arg_ctx.port.val.v_int;
     d_arg.host = arg_ctx.server.val.v_char;
-    d_arg.devices_arg = &arg_ctx.devices.val.v_char_arr;
+    d_arg.devices_arg = &arg_ctx.devices.val.v_path_arr;
     d_arg.type = DAEMON_CLIENT;
     struct relay_arg r_arg = {};
     r_arg.header_sent = RELAY_HEADER_IDLE;
@@ -138,7 +139,6 @@ static int action_daemon(int argc, char** argv, enum daemon_type type) {
     }
 cont:
     arg_ctx.daemon.info.needed = true;
-    arg_ctx.devices.info.optional = true;
     CHECK(parse_args(argc, argv, start_arg, &arg_ctx) == -1);
     if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
         CHECK(d_print_log(type) == -1);

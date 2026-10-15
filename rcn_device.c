@@ -146,7 +146,7 @@ err:
     return -1;
 }
 
-int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type) {
+int dev_init_device_ctx(struct d_context* d_ctx, dev_path_arr* devices_arg, enum daemon_type type) {
     CHECK(u_array_init(&d_ctx->device_ctx->devices.r, sizeof(struct device), RCN_STD_CAPACITY) == -1);
     if (type == DAEMON_CLIENT) {
         CHECK(dev_init_devices_arg(d_ctx->ep_ctx, d_ctx->device_ctx, d_ctx->peer_ctx, devices_arg) == -1);
@@ -159,12 +159,12 @@ err:
     return -1;
 }
 
-int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths) {
+int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, dev_path_arr* dev_paths) {
     for (size_t i = 0; i < dev_paths->r.length; i++) {
-        char* dev_path = {};
+        struct arg_device dev_path = {};
         CHECK(u_array_getv(&dev_paths->r, &dev_path, i) == -1);
         struct device* dev = {};
-        CHECK(dev_init_device(ep_ctx, &dev_ctx->devices, dev_path, &dev) == -1);
+        CHECK(dev_init_device(ep_ctx, &dev_ctx->devices, dev_path.path, &dev) == -1);
         CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &dev->info) == -1);
     }
     return 0;

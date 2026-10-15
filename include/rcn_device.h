@@ -63,9 +63,9 @@ extern const int device_evt_val_arr[];
 extern const char* device_evt_str_arr[DEVICE_EVT_COUNT_INDEX];
 extern const int device_evt_str_length;
 
-int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
+int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, dev_path_arr* dev_paths);
 int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev);
-int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type);
+int dev_init_device_ctx(struct d_context* d_ctx, dev_path_arr* devices_arg, enum daemon_type type);
 int dev_get_all_devices(basic_dev_info_arr* dev_binfos, enum event_types filter);
 int dev_print_basic_info(struct basic_device_info binfo);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);

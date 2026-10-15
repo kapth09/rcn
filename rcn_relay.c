@@ -164,6 +164,17 @@ static void sig_sigint(int sig) {
     exit(0);
 }
 
+static int write_request(struct epoll_stream* stream, struct relay_arg arg) {
+    struct stream_msg request = {};
+    request.header.value = arg.header_sent;
+    request.header.size = 0;
+    CHECK(write(stream->fd, &request, sizeof(request)) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 int relay_start(struct relay_arg arg) {
     signal(SIGINT, sig_sigint);
     if (arg.check_daemon_status == true)
@@ -172,13 +183,10 @@ int relay_start(struct relay_arg arg) {
     struct sock_info info = {};
     CHECK(init_sockinfo(arg.d_type, &info) == -1);
     int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);
-    struct stream_header request = {};
-    request.size = 0;
-    request.value = arg.header_sent;
-    CHECK(write(usock_fd, &request, sizeof(request)) == -1);
-    CHECK(fcntl(usock_fd, F_SETFL, O_NONBLOCK) == -1);
     struct epoll_stream stream = {};
     CHECK(stream_init(&stream, usock_fd, FD_RELAY) == -1);
+    CHECK(write_request(&stream, arg) == -1);
+    CHECK(fcntl(usock_fd, F_SETFL, O_NONBLOCK) == -1);
     struct pollfd fds = {};
     fds.fd = usock_fd;
     fds.events = POLLIN;
@@ -186,6 +194,7 @@ int relay_start(struct relay_arg arg) {
     fflush(stdout);
     for (;;) {
         CHECK(poll(&fds, 1, -1) == -1);
+        CHECK(fds.revents & POLLERR);
         CHECK(stream_stream(&stream) == -1);
         struct stream_item* item = stream.next;
         CHECK(item->state == STREAM_STREAMING_CLOSED);
@@ -313,6 +322,30 @@ err:
     return -1;
 }
 
+static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)d_ctx;
+    (void)stream;
+    (void)stream_item;
+    printf("add\n");
+    return 0;
+}
+
+static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)d_ctx;
+    (void)stream;
+    (void)stream_item;
+    printf("rm\n");
+    return 0;
+}
+
+static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)d_ctx;
+    (void)stream;
+    (void)stream_item;
+    printf("mod\n");
+    return 0;
+}
+
 int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     switch (stream_item->payload.msg.header.value) {
         case RELAY_HEADER_IDLE: {
@@ -341,6 +374,18 @@ int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct strea
         }
         case RELAY_HEADER_LIST: {
             CHECK(handler_list(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case RELAY_HEADER_ADD_DEV: {
+            CHECK(handler_add_dev(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case RELAY_HEADER_RM_DEV: {
+            CHECK(handler_rm_dev(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case RELAY_HEADER_MOD_DEV: {
+            CHECK(handler_mod_dev(d_ctx, stream, stream_item) == -1);
             break;
         }
         default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->payload.msg.header.value);

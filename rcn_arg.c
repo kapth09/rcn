@@ -180,8 +180,8 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
         EARG_WRONG_FLAG(ARG_FLAG_DEVICES);
     if (ctx->devices.info.provided == true)
         EARG_FLAG_AGAIN(ARG_FLAG_DEVICES);
-    char_arr* dev_arr = &ctx->devices.val.v_char_arr;
-    CHECK(u_array_init(&dev_arr->r, sizeof(char*), RCN_STD_CAPACITY) == -1);
+    dev_path_arr* dev_arr = &ctx->devices.val.v_path_arr;
+    CHECK(u_array_init(&dev_arr->r, sizeof(struct arg_device), RCN_STD_CAPACITY) == -1);
     (*i)++;
     for (; *i < argc; (*i)++) {
         char* arg = argv[*i];
@@ -191,7 +191,14 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
                 goto end;
             }
         }
-        u_array_add(&dev_arr->r, &arg);
+        struct arg_device dev = {};
+        size_t path_len = strlen(arg);
+        if (path_len > sizeof(dev.path))
+            ERR_GOTO(err, "err: device path '%s' is too long (%zu characters), max: %zu\n", arg, path_len, sizeof(dev.path));
+        memcpy(dev.path, arg, path_len);
+        CHECK(u_array_add(&dev_arr->r, &dev) == -1);
+        struct arg_device c = {};
+        CHECK(u_array_getv(&dev_arr->r, &c, dev_arr->r.length-1) == -1);
     }
 end:
     ctx->devices.info.provided = true;
@@ -247,11 +254,13 @@ int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx) {
     const char* arg = argv[*i];
     bool found_subaction = false;
     for (int j = 0; j < subactions_length; j++) {
-        if (strcmp(arg, subactions[j]) == 0) {
-            ctx->daemon.val.saction = j;
-            found_subaction = true;
-            break;
-        }
+        if (strcmp(arg, subactions[j]) != 0)
+            continue;
+        ctx->daemon.val.saction = j;
+        found_subaction = true;
+        if (j == SUBACTION_ADD || j == SUBACTION_RM || j == SUBACTION_MOD)
+            ctx->devices.info.needed = true;
+        break;
     }
     if (found_subaction == false) {
         ERR_LOG("unkown subaction '%s'", arg);
@@ -325,9 +334,9 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_LIST: return RELAY_HEADER_LIST;
         case SUBACTION_LS: return RELAY_HEADER_LIST;
         case SUBACTION_SWITCH: return RELAY_HEADER_SWITCH;
-        case SUBACTION_ADD: printf("add\n"); return 0;
-        case SUBACTION_RM: printf("rm\n"); return 0;
-        case SUBACTION_MOD: printf("mod\n"); return 0;
+        case SUBACTION_ADD: return RELAY_HEADER_ADD_DEV;
+        case SUBACTION_RM: return RELAY_HEADER_RM_DEV;
+        case SUBACTION_MOD: return RELAY_HEADER_MOD_DEV;
         default:
             DEBUG_LOG("");
             return -1;

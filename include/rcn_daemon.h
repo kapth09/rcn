@@ -20,7 +20,7 @@ struct daemon_arg {
     int evtfd;
     int port;
     char* host;
-    char_arr* devices_arg;
+    dev_path_arr* devices_arg;
     enum daemon_type type;
 };
 

@@ -101,6 +101,8 @@
                             "If not, a 'auto-subaction' is performed. It automactially checks which daemon is running and sends the subaction to it.\n\t" \
                             "It both server and client are running on the same machine, it defaults to the client."
 
+#define DEV_PATH_MAX_LEN 128
+
 enum subaction_type {
     SUBACTION_PAUSE,
     SUBACTION_RESUME,
@@ -125,6 +127,10 @@ struct subaction {
     union subaction_value value;
 };
 
+struct arg_device {
+    char path[DEV_PATH_MAX_LEN];
+};
+
 struct arg_info {
     bool optional;
     bool needed;
@@ -136,7 +142,7 @@ union arg_data {
     enum event_types filter;
     int v_int;
     char* v_char;
-    char_arr v_char_arr;
+    dev_path_arr v_path_arr;
 };
 
 struct arg {

@@ -14,7 +14,7 @@ enum peer_msg_header {
     PEER_HEADER_STOP,
 };
 
-struct peer_msg_dev_crt {
+struct peer_msg_dev_add {
     struct device dev;
 };
 

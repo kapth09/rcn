@@ -7,6 +7,7 @@
 U_DEFINE_ARR(epoll_stream_arr, struct epoll_stream*);
 U_DEFINE_ARR(device_arr, struct device);
 U_DEFINE_ARR(char_arr, char*);
+U_DEFINE_ARR(dev_path_arr, struct arg_devices);
 U_DEFINE_ARR(uint16_arr, uint16_t);
 U_DEFINE_ARR(relay_devices_list, struct relay_data_list);
 U_DEFINE_ARR(basic_dev_info_arr, struct basic_device_info);
