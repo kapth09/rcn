@@ -1,6 +1,8 @@
 #include "include/rcn.h"
 #include "include/rcn_epoll.h"
 #include "include/rcn_peer.h"
+#include "include/rcn_peer_handler.h"
+#include "include/rcn_relay_handler.h"
 #include "include/rcn_stream.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -237,11 +239,11 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
         }
         switch (stream->fd_type) {
             case FD_PEER: {
-                CHECK(p_handler(d_ctx, stream, stream_item) == -1);
+                CHECK(peer_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_RELAY: {
-                CHECK(r_handler(d_ctx, stream, stream_item) == -1);
+                CHECK(relay_handler(d_ctx, stream, stream_item) == -1);
                 break;
             }
             case FD_DEV: {

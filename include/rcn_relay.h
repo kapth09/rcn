@@ -59,7 +59,6 @@ typedef typeof(int(struct relay_arg arg)) *r_handler_t;
 int r_init_usock(char* sock_path, size_t path_len);
 int relay_start(struct relay_arg arg);
 int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream);
-int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
 int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
 int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx);
