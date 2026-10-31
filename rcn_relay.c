@@ -7,31 +7,20 @@
 #include "include/rcn_types.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include <poll.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/prctl.h>
 #include <sys/un.h>
+#include <signal.h>
 #include <unistd.h>
+#include <sys/poll.h>
+#include <sys/prctl.h>
 
 struct sock_info {
-    char* sock_path;
+    char *sock_path;
     size_t path_len;
 };
 
-static const char* relay_text[] = {
-    [RELAY_HEADER_IDLE] = "",
-    [RELAY_HEADER_START] = "started",
-    [RELAY_HEADER_PAUSE] = "paused",
-    [RELAY_HEADER_PAUSE_AGAIN] = "already paused",
-    [RELAY_HEADER_RESUME] = "resumed",
-    [RELAY_HEADER_RESUME_AGAIN] = "already resumed",
-    [RELAY_HEADER_STOP] = "stopped",
-    [RELAY_HEADER_NO_PEER] = "no peer connected",
-};
-
-static int init_sockinfo(enum daemon_type d_type, struct sock_info* info) {
+static int init_sockinfo(enum daemon_type d_type, struct sock_info *info) {
     if (d_type == DAEMON_SERVER) {
         info->sock_path = RCN_SERVER_USOCKET_PATH;
         info->path_len = RCN_SERVER_USOCKET_LEN;
@@ -42,8 +31,8 @@ static int init_sockinfo(enum daemon_type d_type, struct sock_info* info) {
         goto err;
     }
     return 0;
-err:
-    ERR_LOG("");
+    err:
+        ERR_LOG("");
     return -1;
 }
 
@@ -63,7 +52,7 @@ err:
     return -1;
 }
 
-static int connect_usock(char* sock_path, size_t path_len) {
+int r_connect_usock(char *sock_path, size_t path_len) {
     int usock_fd = TRY(socket(AF_UNIX, SOCK_STREAM, 0), -1);
     struct sockaddr_un r_uaddr = {};
     r_uaddr.sun_family = AF_UNIX;
@@ -87,130 +76,6 @@ err:
     return -1;
 }
 
-static int check_daemon_status(int eventfd) {
-    printf("...");
-    fflush(stdout);
-    int64_t status = 0;
-    const int flags = TRY(fcntl(eventfd, F_GETFL), -1);
-    CHECK(fcntl(eventfd, F_SETFL, flags | O_NONBLOCK) == -1);
-    struct pollfd fds = {};
-    fds.fd = eventfd;
-    fds.events = POLLIN;
-    fflush(stdout);
-    CHECK(poll(&fds, 1, 5000) == -1);
-    read(eventfd, &status, sizeof(status));
-    if (status != DAEMON_STATUS_OK)
-        goto daemon_err;
-    return 0;
-daemon_err:
-    if (status == 0)
-        status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
-    fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
-    fflush(stderr);
-    return -1;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static int request_list(struct stream_item* item) {
-    if (item->payload.msg.header.size == 0) {
-        printf("\rrcn: no devices captured\n");
-        return 0;
-    }
-    relay_devices_list list = {};
-    list.r.size = sizeof(struct relay_data_list);
-    list.r.length = item->payload.msg.header.size / list.r.size;
-    list.r.data = item->payload.msg.buffer;
-    list.r.capacity = list.r.size * list.r.length;
-    for (size_t i = 0; i < list.r.length; i++) {
-        struct relay_data_list* list_entry = {};
-        CHECK(u_array_getr(&list.r, (void**)&list_entry, i) == -1);
-        printf("\rrcn:\t%d\t'%s'", list_entry->random_id, list_entry->dev_name);
-        if (list_entry->grabbed)
-            printf("\t[grabbed]\n");
-        else
-            printf("\t[ungrabbed]\n");
-    }
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static int handle_request(struct stream_item* item) {
-    enum relay_msg_header header = item->payload.msg.header.value;
-    switch (header) {
-        case RELAY_HEADER_START:
-        case RELAY_HEADER_PAUSE:
-        case RELAY_HEADER_PAUSE_AGAIN:
-        case RELAY_HEADER_RESUME:
-        case RELAY_HEADER_RESUME_AGAIN:
-        case RELAY_HEADER_NO_PEER:
-        case RELAY_HEADER_STOP: printf("\rrcn: %s\n", relay_text[header]); break;
-        case RELAY_HEADER_LIST: request_list(item); break;
-        default: goto err;
-    }
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static void sig_sigint(int sig) {
-    (void)sig;
-    printf("\r");
-    LOG("got interrupted");
-    exit(0);
-}
-
-static int write_request(struct epoll_stream* stream, struct relay_arg arg) {
-    struct stream_msg request = {};
-    request.header.value = arg.header_sent;
-    request.header.size = 0;
-    CHECK(write(stream->fd, &request, sizeof(request)) == -1);
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-int relay_start(struct relay_arg arg) {
-    signal(SIGINT, sig_sigint);
-    if (arg.check_daemon_status == true)
-        CHECK(check_daemon_status(arg.evtfd) == -1);
-    CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
-    struct sock_info info = {};
-    CHECK(init_sockinfo(arg.d_type, &info) == -1);
-    int usock_fd = TRY(connect_usock(info.sock_path, info.path_len), -1);
-    struct epoll_stream stream = {};
-    CHECK(stream_init(&stream, usock_fd, FD_RELAY) == -1);
-    CHECK(write_request(&stream, arg) == -1);
-    CHECK(fcntl(usock_fd, F_SETFL, O_NONBLOCK) == -1);
-    struct pollfd fds = {};
-    fds.fd = usock_fd;
-    fds.events = POLLIN;
-    printf("\rrcn>");
-    fflush(stdout);
-    for (;;) {
-        CHECK(poll(&fds, 1, -1) == -1);
-        CHECK(fds.revents & POLLERR);
-        CHECK(stream_stream(&stream) == -1);
-        struct stream_item* item = stream.next;
-        CHECK(item->state == STREAM_STREAMING_CLOSED);
-        if (item->state != STREAM_STREAMING_COMPLETE)
-            continue;
-        CHECK(stream_collect(&stream, &item) == -1);
-        CHECK(handle_request(item) == -1);
-        break;
-    }
-    CHECK(stream_shutdown(&stream) == -1);
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
 int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream) {
     size_t index = TRY(u_array_find_index(&r_ctx->relay_streams.r, &stream), -1);
     CHECK(u_array_remove(&r_ctx->relay_streams.r, index) == -1);
@@ -219,7 +84,6 @@ err:
     ERR_LOG("");
     return -1;
 }
-
 
 int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd) {
     r_ctx->usock_fd = usock_fd;
@@ -239,6 +103,48 @@ int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx)
         CHECK(e_epoll_close_remove_simple(ep_ctx, r_stream) == -1);
     }
     CHECK(u_array_free(&r_ctx->relay_streams.r) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+static int check_daemon_status(int eventfd) {
+    printf("...");
+    fflush(stdout);
+    int64_t status = 0;
+    const int flags = TRY(fcntl(eventfd, F_GETFL), -1);
+    CHECK(fcntl(eventfd, F_SETFL, flags | O_NONBLOCK) == -1);
+    struct pollfd fds = {};
+    fds.fd = eventfd;
+    fds.events = POLLIN;
+    fflush(stdout);
+    CHECK(poll(&fds, 1, 5000) == -1);
+    read(eventfd, &status, sizeof(status));
+    if (status != DAEMON_STATUS_OK)
+        goto daemon_err;
+    return 0;
+    daemon_err:
+        if (status == 0)
+            status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
+    fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
+    fflush(stderr);
+    return -1;
+    err:
+        ERR_LOG("");
+    return -1;
+}
+
+int relay_start(struct epoll_stream* relay_stream, struct relay_arg r_arg) {
+    signal(SIGINT, r_arg.sighandler);
+    if (r_arg.check_daemon == true)
+        CHECK(check_daemon_status(r_arg.evt_fd) == -1);
+    CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_RELAY, 0UL, 0UL, 0UL) == -1);
+    struct sock_info info = {};
+    CHECK(init_sockinfo(r_arg.d_type, &info) == -1);
+    int usock_fd = TRY(r_connect_usock(info.sock_path, info.path_len), -1);
+    CHECK(stream_init(relay_stream, usock_fd, FD_RELAY) == -1);
+    CHECK(fcntl(usock_fd, F_SETFL, O_NONBLOCK) == -1);
     return 0;
 err:
     ERR_LOG("");

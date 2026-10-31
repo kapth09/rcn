@@ -111,7 +111,6 @@ err:
     ERR_LOG("");
     return -1;
 }
-
 int dev_print_basic_info(struct basic_device_info binfo) {
     putchar('[');
     int c = 0;

@@ -1,9 +1,10 @@
 #include "include/rcn.h"
 #include "include/rcn_arg.h"
+#include "include/rcn_ctl.h"
 #include "include/rcn_daemon.h"
-#include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 enum debug_level g_debug_level = DEBUG_OFF;
@@ -44,11 +45,11 @@ err:
 }
 
 static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type) {
-    struct relay_arg r_arg = {};
+    struct ctl_arg r_arg = {};
     r_arg.d_type = d_type;
     r_arg.header_sent = TRY(subaction_to_rcn_msg(sa_type), -1);
     r_arg.check_daemon_status = false;
-    CHECK(relay_start(r_arg) == -1);
+    CHECK(rcn_ctl(r_arg) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -64,7 +65,7 @@ static int action_start(int argc, char** argv) {
     struct daemon_arg d_arg = {};
     d_arg.type = DAEMON_SERVER;
     d_arg.port = arg_ctx.port.val.v_int;
-    struct relay_arg r_arg = {};
+    struct ctl_arg r_arg = {};
     r_arg.header_sent = RELAY_HEADER_START;
     r_arg.d_type = DAEMON_SERVER;
     r_arg.check_daemon_status = true;
@@ -89,7 +90,7 @@ static int action_connect(int argc, char** argv) {
     d_arg.host = arg_ctx.server.val.v_char;
     d_arg.devices_arg = &arg_ctx.devices.val.v_path_arr;
     d_arg.type = DAEMON_CLIENT;
-    struct relay_arg r_arg = {};
+    struct ctl_arg r_arg = {};
     r_arg.header_sent = RELAY_HEADER_IDLE;
     r_arg.d_type = DAEMON_CLIENT;
     r_arg.check_daemon_status = true;

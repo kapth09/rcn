@@ -30,15 +30,23 @@ err:
     return -1;
 }
 
-int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream) {
-    struct epoll_stream* stream= TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
-    stream->fd_type= type;
-    CHECK(stream_init(stream, fd, type) == -1);
+int e_epoll_add_stream(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
     CHECK(u_array_add(&ep_ctx->stream_ptrs.r, &stream) == -1);
     struct epoll_event u_evt = {};
     u_evt.events = EPOLLIN;
     u_evt.data.ptr = stream;
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, stream->fd, &u_evt) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream) {
+    struct epoll_stream* stream= TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
+    stream->fd_type= type;
+    CHECK(stream_init(stream, fd, type) == -1);
+    CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);
     *out_stream = stream;
     return 0;
 err:

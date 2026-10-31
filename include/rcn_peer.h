@@ -48,5 +48,7 @@ struct peer_context {
 int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, int port, enum daemon_type d_type);
 int p_close_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
 int p_close_peer(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
+int p_connect_sock(int port, char* host);
+int p_init_sock(int port);
 
 #endif //RCN_RCN_PEER_H

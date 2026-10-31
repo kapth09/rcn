@@ -55,8 +55,8 @@ err:
     ERR_LOG("");
     return -1;
 }
+
 static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
     (void)stream;
     (void)stream_item;
     if (d_ctx->type == DAEMON_CLIENT)
@@ -71,14 +71,14 @@ err:
     ERR_LOG("");
     return -1;
 }
+
 static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
     (void)stream;
     (void)stream_item;
     if (d_ctx->type == DAEMON_SERVER) {
         CHECK(dev_close_device_ctx(d_ctx->ep_ctx, d_ctx->device_ctx) == -1);
         CHECK(dev_init_device_ctx(d_ctx, NULL, DAEMON_SERVER) == -1);
-        d_ctx->peer_ctx->isock_stream->fd = TRY(d_init_inet_sock(d_ctx->peer_ctx->isock_port), -1);
+        d_ctx->peer_ctx->isock_stream->fd = TRY(p_init_sock(d_ctx->peer_ctx->isock_port), -1);
         CHECK(p_init_peer_ctx(d_ctx->ep_ctx, d_ctx->peer_ctx, d_ctx->peer_ctx->isock_stream->fd, d_ctx->peer_ctx->isock_port, DAEMON_SERVER) == -1);
         d_ctx->state = RCN_RUNNING;
     } else if (d_ctx->type == DAEMON_CLIENT) {
