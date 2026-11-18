@@ -187,6 +187,11 @@ err:
 }
 
 int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl) {
+    // Prevent re-grabbing/re-releasing an already grabbed/released device
+    if (dev->grabbed && ctrl == DEV_CTRL_CAPTURE)
+        return 0;
+    if (!dev->grabbed && ctrl == DEV_CTRL_RELEASE)
+        return 0;
     CHECK(drain_events(dev) == -1);
     CHECK(ioctl(dev->stream->fd, EVIOCGRAB, ctrl == DEV_CTRL_CAPTURE) == -1);
     if (ctrl == DEV_CTRL_CAPTURE) {
@@ -369,20 +374,28 @@ err:
     return -1;
 }
 
+int dev_ctrl_device(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl) {
+    CHECK(dev_grab_device_by_ptr(ep_ctx, p_ctx, dev, ctrl) == -1);
+    struct epoll_event ep_evt = {};
+    ep_evt.events = dev->stream->fd_type == FD_DEV ? EPOLLIN : EPOLLOUT;
+    ep_evt.data.ptr = dev->stream;
+    int res = 0;
+    if (ctrl == DEV_CTRL_RELEASE)
+        res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, dev->stream->fd, &ep_evt);
+    else if (ctrl == DEV_CTRL_CAPTURE)
+        res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, dev->stream->fd, &ep_evt);
+    CHECK(res == -1 && errno != EEXIST && errno != ENOENT);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 int dev_ctrl_devices(struct epoll_context* ep_ctx, struct peer_context* p_ctx, device_arr* devices, enum device_ctrl ctrl) {
     for (size_t i = 0; i < devices->r.length; i++) {
         struct device* dev = {};
         CHECK(u_array_getr(&devices->r, (void**)&dev, i) == -1);
-        CHECK(dev_grab_device_by_ptr(ep_ctx, p_ctx, dev, ctrl) == -1);
-        struct epoll_event ep_evt = {};
-        ep_evt.events = dev->stream->fd_type == FD_DEV ? EPOLLIN : EPOLLOUT;
-        ep_evt.data.ptr = dev->stream;
-        int res = 0;
-        if (ctrl == DEV_CTRL_RELEASE)
-            res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_DEL, dev->stream->fd, &ep_evt);
-        else if (ctrl == DEV_CTRL_CAPTURE)
-            res = epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, dev->stream->fd, &ep_evt);
-        CHECK(res == -1 && errno != EEXIST && errno != ENOENT);
+        CHECK(dev_ctrl_device(ep_ctx, p_ctx, dev, ctrl) == -1);
     }
     return 0;
 err:

@@ -78,6 +78,7 @@ int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct str
 int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event);
 int dev_release_virt_keys(struct epoll_context* ep_ctx, struct device* device);
 int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices);
+int dev_ctrl_device(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_ctrl_devices(struct epoll_context* ep_ctx, struct peer_context* p_ctx, device_arr* devices, enum device_ctrl ctrl);
 
 #endif //RCN_RCN_DEV_H

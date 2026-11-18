@@ -114,12 +114,18 @@ static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream,
         printf("err: server cannot add device\n");
         return 0;
     }
-    printf("add\n");
     dev_path_arr devices = {};
     devices.r.data = stream_item->payload.msg.buffer;
     devices.r.size = sizeof(struct arg_device);
     devices.r.length = stream_item->buffer_streamed / sizeof(struct arg_device);
-    CHECK(dev_init_devices_arg(d_ctx->ep_ctx, d_ctx->device_ctx, d_ctx->peer_ctx, &devices) == -1);
+    for (size_t i = 0; i < devices.r.length; i++) {
+        struct arg_device dev_path = {};
+        CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
+        struct device* device = {};
+        CHECK(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path.path, &device) == -1);
+        CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_CAPTURE) == -1);
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &device->info) == -1);
+    }
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
 err:
@@ -153,8 +159,7 @@ int relay_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct s
         case RELAY_HEADER_START: {
             CHECK(handler_start(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_PAUSE: {
+        } case RELAY_HEADER_PAUSE: {
             CHECK(handler_pause(d_ctx, stream, stream_item) == -1);
             break;
         }
@@ -174,6 +179,7 @@ int relay_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct s
             CHECK(handler_list(d_ctx, stream, stream_item) == -1);
             break;
         }
+        // Add "grabbed" to device-info
         case RELAY_HEADER_ADD_DEV: {
             CHECK(handler_add_dev(d_ctx, stream, stream_item) == -1);
             break;
