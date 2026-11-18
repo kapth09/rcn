@@ -110,11 +110,22 @@ err:
 }
 
 static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
+    if (d_ctx->type == DAEMON_SERVER) {
+        printf("err: server cannot add device\n");
+        return 0;
+    }
     printf("add\n");
+    dev_path_arr devices = {};
+    devices.r.data = stream_item->payload.msg.buffer;
+    devices.r.size = sizeof(struct arg_device);
+    devices.r.length = stream_item->buffer_streamed / sizeof(struct arg_device);
+    CHECK(dev_init_devices_arg(d_ctx->ep_ctx, d_ctx->device_ctx, d_ctx->peer_ctx, &devices) == -1);
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
+err:
+    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+    ERR_LOG("");
+    return -1;
 }
 
 static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {

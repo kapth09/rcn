@@ -124,14 +124,14 @@ static int check_daemon_status(int eventfd) {
     if (status != DAEMON_STATUS_OK)
         goto daemon_err;
     return 0;
-    daemon_err:
-        if (status == 0)
-            status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
+daemon_err:
+    if (status == 0)
+        status = ETIMEDOUT; // a poll-timeout results in status=SUCCESS, so convert to a proper ETIMEDOUT error
     fprintf(stderr, "\rerr: cannot start daemon because [%s]\n", strerror(status));
     fflush(stderr);
     return -1;
-    err:
-        ERR_LOG("");
+err:
+    ERR_LOG("");
     return -1;
 }
 

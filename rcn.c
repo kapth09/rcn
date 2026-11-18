@@ -44,11 +44,42 @@ err:
     return -1;
 }
 
-static int subaction_daemon(enum daemon_type d_type, enum subaction_type sa_type) {
+static int find_daemon_type(enum daemon_type* type) {
+    if (daemon_is_running(DAEMON_CLIENT) == 0) {
+        *type = DAEMON_CLIENT;
+        return 0;
+    } if (daemon_is_running(DAEMON_SERVER) == 0) {
+        *type = DAEMON_SERVER;
+        return 0;
+    }
+    fprintf(stderr, "err: no daemon running\n");
+    return -1;
+}
+
+static int set_ctl_payload(struct ctl_payload* payload, enum subaction_type sa_type) {
+    enum relay_msg_header relay_header = TRY(subaction_to_rcn_msg(sa_type), -1);
+    payload->relay_header = relay_header;
+    switch (sa_type) {
+        case SUBACTION_ADD:
+        case SUBACTION_MOD:
+        case SUBACTION_RM:
+            dev_path_arr* devices = &arg_ctx.devices.val.v_path_arr;
+            payload->data = devices->r.data;
+            payload->size = devices->r.size * devices->r.length;
+            break;
+        default:
+            payload->data = NULL;
+            payload->size = 0;
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+static int subaction_daemon(enum daemon_type d_type) {
     struct ctl_payload c_payload = {};
-    c_payload.relay_header = TRY(subaction_to_rcn_msg(sa_type), -1);
-    c_payload.data = NULL;
-    c_payload.size = 0;
+    CHECK(set_ctl_payload(&c_payload, arg_ctx.daemon.val.saction) == -1);
     struct ctl_arg c_arg = {};
     c_arg.payload = c_payload;
     c_arg.d_type = d_type;
@@ -139,24 +170,14 @@ static int action_daemon(int argc, char** argv, enum daemon_type type) {
     int start_arg = 2;
     if (type == DAEMON_UNKNOWN) {
         start_arg = 1;
-        if (daemon_is_running(DAEMON_CLIENT) == 0) {
-            type = DAEMON_CLIENT;
-            goto cont;
-        }
-        if (daemon_is_running(DAEMON_SERVER) == 0) {
-            type = DAEMON_SERVER;
-            goto cont;
-        }
-        fprintf(stderr, "err: no daemon running\n");
-        goto err;
+        CHECK(find_daemon_type(&type) == -1);
     }
-cont:
     arg_ctx.daemon.info.needed = true;
     CHECK(parse_args(argc, argv, start_arg, &arg_ctx) == -1);
     if (arg_ctx.daemon.val.saction == SUBACTION_LOG)
         CHECK(d_print_log(type) == -1);
     else
-        CHECK(subaction_daemon(type, arg_ctx.daemon.val.saction) == -1);
+        CHECK(subaction_daemon(type) == -1);
     return 0;
 err:
     DEBUG_LOG("");
@@ -190,6 +211,8 @@ int main(int argc, char** argv) {
     else if (strcmp(action, ARG_ACTION_SHOW) == 0)
         CHECK(action_show(argc, argv));
     else if (strcmp(action, ARG_FLAG_HELP) == 0)
+        CHECK(help(argc, argv) == -1);
+    else if (strcmp(action, ARG_FLAG_LONG_HELP) == 0)
         CHECK(help(argc, argv) == -1);
     else
         CHECK(action_daemon(argc, argv, DAEMON_UNKNOWN) == -1);

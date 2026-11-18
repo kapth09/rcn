@@ -18,6 +18,8 @@ static const char *relay_text[] = {
     [RELAY_HEADER_RESUME_AGAIN] = "already resumed",
     [RELAY_HEADER_STOP] = "stopped",
     [RELAY_HEADER_NO_PEER] = "no peer connected",
+    [RELAY_HEADER_DEV_CONFIG_SUCCESS] = "device configuration succeeded",
+    [RELAY_HEADER_DEV_CONFIG_FAILURE] = "device configuration failed",
 };
 
 static int request_list(struct stream_item *item) {
@@ -61,6 +63,8 @@ static int handle_request(struct stream_item *item) {
         case RELAY_HEADER_RESUME:
         case RELAY_HEADER_RESUME_AGAIN:
         case RELAY_HEADER_NO_PEER:
+        case RELAY_HEADER_DEV_CONFIG_SUCCESS:
+        case RELAY_HEADER_DEV_CONFIG_FAILURE:
         case RELAY_HEADER_STOP: printf("\rrcn: %s\n", relay_text[header]);
             break;
         case RELAY_HEADER_LIST: request_list(item);
@@ -69,7 +73,7 @@ static int handle_request(struct stream_item *item) {
     }
     return 0;
 err:
-    ERR_LOG("");
+    ERR_LOG("unknown relay header: %d", header);
     return -1;
 }
 
@@ -81,7 +85,6 @@ static int init_ctl(struct ctl_arg c_arg, struct epoll_context* ep_ctx) {
     r_arg.d_type = c_arg.d_type;
     struct epoll_stream* stream = calloc(1, sizeof(struct epoll_stream));
     CHECK(relay_start(stream, r_arg) == -1);
-
     CHECK(e_init_epoll_ctx(ep_ctx) == -1);
     CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);
     struct ctl_payload payload = c_arg.payload;

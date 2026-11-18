@@ -231,11 +231,10 @@ err:
 }
 
 static int d_init(struct daemon_arg arg) {
-    if (arg.type == DAEMON_SERVER) {
+    if (arg.type == DAEMON_SERVER)
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_SERVER, 0UL, 0UL, 0UL) == -1);
-    } else {
+    else
         CHECK(prctl(PR_SET_NAME, RCN_PROC_NAME_CLIENT, 0UL, 0UL, 0UL) == -1);
-    }
     CHECK(setsid() == -1);
     CHECK(d_init_dir() == -1);
     CHECK(d_init_log(arg.type) == -1);

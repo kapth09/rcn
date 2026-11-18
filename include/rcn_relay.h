@@ -25,6 +25,8 @@ enum relay_msg_header {
     RELAY_HEADER_ADD_DEV,
     RELAY_HEADER_RM_DEV,
     RELAY_HEADER_MOD_DEV,
+    RELAY_HEADER_DEV_CONFIG_SUCCESS,
+    RELAY_HEADER_DEV_CONFIG_FAILURE,
 };
 
 struct relay_msg {
