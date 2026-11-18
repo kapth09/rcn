@@ -3,10 +3,15 @@
 
 #include "rcn_relay.h"
 
+struct ctl_payload {
+    void* data;
+    size_t size;
+    enum relay_msg_header relay_header;
+};
+
 struct ctl_arg {
-    struct arg devices;
+    struct ctl_payload payload;
     int evtfd;
-    enum relay_msg_header header_sent;
     enum daemon_type d_type;
     bool check_daemon_status;
 };

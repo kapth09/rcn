@@ -8,7 +8,6 @@
 #include <string.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
-#include <unistd.h>
 
 static const char *relay_text[] = {
     [RELAY_HEADER_IDLE] = "",
@@ -85,7 +84,8 @@ static int init_ctl(struct ctl_arg c_arg, struct epoll_context* ep_ctx) {
 
     CHECK(e_init_epoll_ctx(ep_ctx) == -1);
     CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);
-    CHECK(stream_queue_writing_socket(ep_ctx, stream, c_arg.header_sent, 0, NULL) == -1);
+    struct ctl_payload payload = c_arg.payload;
+    CHECK(stream_queue_writing_socket(ep_ctx, stream, payload.relay_header, payload.size, payload.data) == -1);
     printf("\rrcn>");
     fflush(stdout);
     return 0;
@@ -114,8 +114,10 @@ int rcn_ctl(struct ctl_arg c_arg) {
             if (item->state != STREAM_STREAMING_COMPLETE)
                 continue;
             CHECK(stream_collect(stream, &item) == -1);
-            if (item->op == STREAM_OP_READING)
+            if (item->op == STREAM_OP_READING) {
                 CHECK(handle_request(item) == -1);
+                stream_closed = true;
+            }
             CHECK(e_epoll_reset_stream(&ep_ctx, stream) == -1);
         }
     }
