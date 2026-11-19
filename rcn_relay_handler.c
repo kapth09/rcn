@@ -3,9 +3,13 @@
 #include "include/rcn_peer.h"
 #include "include/rcn_relay.h"
 #include "include/rcn_relay_handler.h"
+
+#include <limits.h>
+
 #include "include/rcn_stream.h"
 #include "include/rcn_types.h"
 #include <string.h>
+#include <stdlib.h>
 
 static int handler_start(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
@@ -109,9 +113,24 @@ err:
     return -1;
 }
 
+static int dyn_add_dev(struct d_context* d_ctx, char* dev_path) {
+    struct device* device = {};
+    CHECK(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path, &device) == -1);
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &device->info) == -1);
+    if (d_ctx->state == RCN_STATE_PAUSED)
+        CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_RELEASE) == -1);
+    else if (d_ctx->state == RCN_STATE_RUNNING)
+        CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_CAPTURE) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     if (d_ctx->type == DAEMON_SERVER) {
         printf("err: server cannot add device\n");
+        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
         return 0;
     }
     dev_path_arr devices = {};
@@ -121,13 +140,7 @@ static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream,
     for (size_t i = 0; i < devices.r.length; i++) {
         struct arg_device dev_path = {};
         CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
-        struct device* device = {};
-        CHECK(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path.path, &device) == -1);
-        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &device->info) == -1);
-        if (d_ctx->state == RCN_STATE_PAUSED)
-            CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_RELEASE) == -1);
-        else if (d_ctx->state == RCN_STATE_RUNNING)
-            CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_CAPTURE) == -1);
+        CHECK(dyn_add_dev(d_ctx, dev_path.path) == -1);
     }
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
@@ -145,12 +158,58 @@ static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, 
     return 0;
 }
 
-static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    printf("mod\n");
+static int dyn_mod_dev(struct d_context* d_ctx, char* dev_path) {
+    CHECK_LBL(dev_path[0] == '\0', invalid);
+    char* endptr = {};
+    unsigned long random_id_long = strtoul(dev_path, &endptr, 10);
+    CHECK_LBL(endptr == dev_path || endptr[0] != '\0', invalid);
+    CHECK_LBL(random_id_long == ULONG_MAX, invalid);
+    CHECK_LBL(random_id_long > UINT16_MAX, invalid);
+    uint16_t random_id = (uint16_t)random_id_long;
+    struct device* device = {};
+    printf("id %d\n", random_id);
+    CHECK_LBL(dev_find_by_id(&d_ctx->device_ctx->devices, random_id, &device) == -1, invalid);
+    enum device_ctrl ctrl = {};
+    if (device->grabbed == true)
+        ctrl = DEV_CTRL_RELEASE;
+    else if (device->grabbed == false)
+        ctrl = DEV_CTRL_CAPTURE;
+    CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, ctrl) == -1);
     return 0;
+err:
+    ERR_LOG("");
+    return -1;
+invalid:
+    ERR_LOG("");
+    return -2;
+}
+
+static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    if (d_ctx->type == DAEMON_SERVER) {
+        printf("err: server cannot add device\n");
+        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+        return 0;
+    }
+    dev_path_arr devices = {};
+    devices.r.data = stream_item->payload.msg.buffer;
+    devices.r.size = sizeof(struct arg_device);
+    devices.r.length = stream_item->buffer_streamed / sizeof(struct arg_device);
+    for (size_t i = 0; i < devices.r.length; i++) {
+        struct arg_device dev_path = {};
+        CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
+        int ret = dyn_mod_dev(d_ctx, dev_path.path);
+        CHECK(ret == -1);
+        if (ret == -2) {
+            stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+            return 0;
+        }
+    }
+    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL);
+    return 0;
+err:
+    ERR_LOG("");
+    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+    return -1;
 }
 
 int relay_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {

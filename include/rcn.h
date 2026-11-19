@@ -52,6 +52,12 @@ extern enum debug_level g_debug_level;
 	errno = 0;						\
     } while(0)
 
+#define CHECK_LBL(condition, label) \
+    do { 					        \
+	if ((condition)) goto label; 		\
+	errno = 0;						\
+    } while(0)
+
 #define TRY(expr, err_val) ({            \
     __typeof__(expr) _ret = (expr);      \
     if (_ret == (err_val)) goto err;     \

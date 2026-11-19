@@ -301,12 +301,17 @@ err:
     return -1;
 }
 
-int dev_find_by_id(device_arr* devices, size_t random_id, struct device** out_dev) {
+int dev_find_by_id(device_arr* devices, uint16_t random_id, struct device** out_dev) {
+    bool found = false;
     for (size_t i = 0; i < devices->r.length; i++) {
         CHECK(u_array_getr(&devices->r, (void**)out_dev, i) == -1);
-        if ((*out_dev)->info.random_id == random_id)
+        if ((*out_dev)->info.random_id == random_id) {
+            found = true;
             break;
+        }
     }
+    if (found == false)
+        *out_dev = NULL;
     return 0;
 err:
     ERR_LOG("");

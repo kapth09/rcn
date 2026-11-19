@@ -71,7 +71,7 @@ int dev_print_basic_info(struct basic_device_info binfo);
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_get_device_info(int dev_fd, struct device* dev);
-int dev_find_by_id(device_arr* devices, size_t random_id, struct device** out_dev);
+int dev_find_by_id(device_arr* devices, uint16_t random_id, struct device** out_dev);
 int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device_info* info_template);
 int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
