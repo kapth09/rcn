@@ -111,7 +111,7 @@ err:
 
 static int dyn_add_dev(struct d_context* d_ctx, char* dev_path) {
     struct device* device = {};
-    CHECK(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path, &device) == -1);
+    CHECK_LBL(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path, &device) == -1, invalid);
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &device->info) == -1);
     if (d_ctx->state == RCN_STATE_PAUSED)
         CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_RELEASE) == -1);
@@ -121,12 +121,15 @@ static int dyn_add_dev(struct d_context* d_ctx, char* dev_path) {
 err:
     ERR_LOG("");
     return -1;
+invalid:
+    ERR_LOG("");
+    return -2;
 }
 
 static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     if (d_ctx->type == DAEMON_SERVER) {
         printf("err: server cannot add devices\n");
-        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL) == -1);
         return 0;
     }
     dev_path_arr devices = {};
@@ -136,7 +139,10 @@ static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream,
     for (size_t i = 0; i < devices.r.length; i++) {
         struct arg_device dev_path = {};
         CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
-        CHECK(dyn_add_dev(d_ctx, dev_path.path) == -1);
+        int ret = dyn_add_dev(d_ctx, dev_path.path);
+        CHECK(ret == -1);
+        if (ret == -2)
+            stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
     }
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
@@ -169,7 +175,7 @@ static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, 
     (void)stream_item;
     if (d_ctx->type == DAEMON_SERVER) {
         printf("err: server cannot remove devices\n");
-        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL) == -1);
         return 0;
     }
     dev_path_arr devices = {};
@@ -183,9 +189,9 @@ static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, 
         int ret = dyn_rm_dev(d_ctx, device.path);
         CHECK(ret == -1);
         if (ret == -2)
-            stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+            CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL) == -1);
     }
-    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL);
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
 err:
     stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
@@ -217,7 +223,7 @@ invalid:
 static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     if (d_ctx->type == DAEMON_SERVER) {
         printf("err: server cannot modify devices\n");
-        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL) == -1);
         return 0;
     }
     dev_path_arr devices = {};
@@ -230,9 +236,9 @@ static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream,
         int ret = dyn_mod_dev(d_ctx, dev_path.path);
         CHECK(ret == -1);
         if (ret == -2)
-            stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+            CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL) == -1);
     }
-    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL);
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
 err:
     ERR_LOG("");
