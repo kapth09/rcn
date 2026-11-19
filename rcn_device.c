@@ -181,6 +181,8 @@ int dev_close_device(struct epoll_context* ep_ctx, struct device_context* dev_ct
             continue;
         CHECK(e_epoll_close_remove_simple(ep_ctx, device->stream) == -1);
         CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+        if (tmp_device != dev_ctx->devices.r.data)
+            free(tmp_device);
     }
     return 0;
 err:
@@ -196,6 +198,8 @@ int dev_close_device_by_id(struct epoll_context* ep_ctx, struct device_context* 
             continue;
         CHECK(e_epoll_close_remove_simple(ep_ctx, tmp_device->stream) == -1);
         CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+        if (tmp_device != dev_ctx->devices.r.data)
+            free(tmp_device);
     }
     return 0;
 err:
@@ -204,13 +208,14 @@ err:
 }
 
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx) {
-    while (dev_ctx->devices.r.length > 0) {
+    for (ssize_t i = (ssize_t)dev_ctx->devices.r.length-1; i > 1; i--) {
         struct device* dev = {};
-        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, 0) == -1);
+        printf("i %zu\n", i);
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, i) == -1);
         CHECK(e_epoll_close_remove_simple(ep_ctx, dev->stream) == -1);
-        CHECK(u_array_remove(&dev_ctx->devices.r, 0) == -1);
+        free(dev);
     }
-    CHECK(u_array_free(&dev_ctx->devices.r) == -1);
+    free(dev_ctx->devices.r.data);
     return 0;
 err:
     ERR_LOG("");
@@ -323,6 +328,7 @@ int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct devi
     CHECK(apply_udev_info(u_fd, device, template) == -1);
     CHECK(e_epoll_add_device(ep_ctx, u_fd, device, FD_UDEV) == -1);
     CHECK(u_array_add(&devices->r, device) == -1);
+    u_safe_free((void**)&device);
     LOG("recreated device '%s'", template->name);
     return 0;
 err:
@@ -403,9 +409,14 @@ err:
 }
 
 int dev_close_dev_naive(struct device_context* dev_ctx, struct epoll_stream* stream) {
-    size_t index = TRY(u_array_find_index(&dev_ctx->devices.r, &stream), -1);
-    CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
-    return 0;
+    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getv(&dev_ctx->devices.r, &dev, i) == -1);
+        if (dev->stream == stream) {
+            CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+            return 0;
+        }
+    }
 err:
     ERR_LOG("");
     return -1;

@@ -193,7 +193,7 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
         }
         struct arg_device dev = {};
         size_t path_len = strlen(arg);
-        if (path_len > sizeof(dev.path))
+        if (path_len >= sizeof(dev.path))
             ERR_GOTO(err, "err: device path '%s' is too long (%zu characters), max: %zu\n", arg, path_len, sizeof(dev.path));
         memcpy(dev.path, arg, path_len);
         CHECK(u_array_add(&dev_arr->r, &dev) == -1);

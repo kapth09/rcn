@@ -99,7 +99,7 @@ static int init_ctl(struct ctl_arg c_arg, struct epoll_context* ep_ctx) {
     r_arg.sighandler = sig_sigint;
     r_arg.check_daemon = c_arg.check_daemon_status;
     r_arg.d_type = c_arg.d_type;
-    struct epoll_stream* stream = calloc(1, sizeof(struct epoll_stream));
+    struct epoll_stream* stream = TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
     CHECK(relay_start(stream, r_arg) == -1);
     CHECK(e_init_epoll_ctx(ep_ctx) == -1);
     CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);

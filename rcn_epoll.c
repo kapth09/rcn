@@ -44,7 +44,7 @@ err:
 
 int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream) {
     struct epoll_stream* stream= TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
-    stream->fd_type= type;
+    stream->fd_type = type;
     CHECK(stream_init(stream, fd, type) == -1);
     CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);
     *out_stream = stream;

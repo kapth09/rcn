@@ -98,7 +98,7 @@ int p_connect_sock(int port, char* host) {
     }
     freeaddrinfo(p_info);
     CHECK(connected == false);
-    int fd_flags = TRY(fcntl(isock_fd, F_GETFL, 0), 1);
+    int fd_flags = TRY(fcntl(isock_fd, F_GETFL, 0), -1);
     CHECK(fcntl(isock_fd, F_SETFL, O_NONBLOCK | fd_flags) == -1);
     LOG("connected to server %s", host);
     return isock_fd;

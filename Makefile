@@ -21,4 +21,8 @@ uninstall:
 clean:
 	rm -f $(TARGET)
 
+asan: CFLAGS += -fsanitize=address
+asan:
+	$(CC) $(SRCS) $(CFLAGS) -o $(TARGET)
+
 .PHONY: default clean

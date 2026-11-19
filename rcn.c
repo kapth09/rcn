@@ -119,7 +119,7 @@ err:
 /* rcn connect -h <...> -p 800 -d <...> <...> <...> */
 static int action_connect(int argc, char** argv) {
     if (argc < 8)
-        EARG_COUNT(ARG_ACTION_START, 8, argc);
+        EARG_COUNT(ARG_ACTION_CONNECT, 8, argc);
     arg_ctx.devices.info.needed = true;
     arg_ctx.port.info.needed = true;
     arg_ctx.server.info.needed = true;

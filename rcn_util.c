@@ -189,8 +189,6 @@ ssize_t u_array_find_index(struct u_array* arr, void* element) {
         if (memcmp(offset, element, arr->size) == 0)
             return (ssize_t)i;
     }
-    ERR_LOG("");
-    return -1;
 err:
     ERR_LOG("");
     return -1;
@@ -210,7 +208,7 @@ int u_array_from_stream_shallow(struct u_array* arr, struct stream_item* stream_
     arr->data = stream_item->payload.msg.buffer;
     arr->size = size;
     arr->length = stream_item->buffer_streamed / size;
-    arr->capacity = arr->size * arr->length;
+    arr->capacity = arr->length;
     return 0;
 }
 

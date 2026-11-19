@@ -124,37 +124,31 @@ static int can_exit(struct d_context* d_ctx) {
 static int dispatch_epoll(struct d_context* d_ctx, struct epoll_event* epoll_buff, size_t fd_count) {
     struct epoll_context* ep_ctx = d_ctx->ep_ctx;
     int nfds = TRY(epoll_wait(ep_ctx->epoll_fd, epoll_buff, fd_count, -1), -1);
+    int kept_streams = 0;
     for (int i = 0; i < nfds; i++) {
         struct epoll_event evt = epoll_buff[i];
         struct epoll_stream* stream = evt.data.ptr;
+        bool keep = true;
         switch (stream->fd_type) {
-            case FD_USOCK: {
+            case FD_USOCK:
                 CHECK(accept_usock(ep_ctx, &d_ctx->relay_ctx->relay_streams, stream) == -1);
                 break;
-            }
-            case FD_ISOCK: {
+            case FD_ISOCK:
                 CHECK(accept_isock(ep_ctx, d_ctx->peer_ctx, stream) == -1);
+                keep = false;
                 break;
-            }
-            case FD_PEER: {
+            case FD_PEER:
+            case FD_RELAY:
+            case FD_DEV:
+            case FD_UDEV:
                 CHECK(stream_stream(stream) == -1);
                 break;
-            }
-            case FD_RELAY: {
-                CHECK(stream_stream(stream) == -1);
-                break;
-            }
-            case FD_DEV: {
-                CHECK(stream_stream(stream) == -1);
-                break;
-            }
-            case FD_UDEV: {
-                CHECK(stream_stream(stream) == -1);
-                break;
-            }
+        }
+        if (keep == true) {
+            epoll_buff[kept_streams++] = evt;
         }
     }
-    return nfds;
+    return kept_streams;
 err:
     ERR_LOG("");
     return -1;
@@ -178,18 +172,15 @@ static int resolve_fd_streams(struct d_context* d_ctx, struct epoll_event* epoll
             continue;
         }
         switch (stream->fd_type) {
-            case FD_PEER: {
+            case FD_PEER:
                 CHECK(peer_handler(d_ctx, stream, stream_item) == -1);
                 break;
-            }
-            case FD_RELAY: {
+            case FD_RELAY:
                 CHECK(relay_handler(d_ctx, stream, stream_item) == -1);
                 break;
-            }
-            case FD_DEV: {
+            case FD_DEV:
                 CHECK(dev_handler(d_ctx, stream, stream_item) == -1);
                 break;
-            }
             case FD_UDEV: break;
             case FD_ISOCK: return 0;
             case FD_USOCK: return 0;

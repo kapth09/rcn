@@ -77,7 +77,8 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
     d_ctx->exit = true;
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
-    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
+    if (d_ctx->peer_ctx->peer_state == PEER_CONNECTED)
+        CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_STOP, 0, NULL) == -1);
     return 0;
 err:
     ERR_LOG("");
