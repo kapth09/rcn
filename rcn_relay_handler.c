@@ -3,13 +3,9 @@
 #include "include/rcn_peer.h"
 #include "include/rcn_relay.h"
 #include "include/rcn_relay_handler.h"
-
-#include <limits.h>
-
 #include "include/rcn_stream.h"
 #include "include/rcn_types.h"
 #include <string.h>
-#include <stdlib.h>
 
 static int handler_start(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
@@ -129,7 +125,7 @@ err:
 
 static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     if (d_ctx->type == DAEMON_SERVER) {
-        printf("err: server cannot add device\n");
+        printf("err: server cannot add devices\n");
         stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
         return 0;
     }
@@ -150,24 +146,58 @@ err:
     return -1;
 }
 
+static int dyn_rm_dev(struct d_context* d_ctx, char* dev_path) {
+    uint16_t random_id = 0;
+    CHECK_LBL(u_str_to_ushort(dev_path, &random_id) == -1, invalid);
+    printf("id %d\n", random_id);
+    struct device* device = {};
+    CHECK_LBL(dev_find_by_id(&d_ctx->device_ctx->devices, random_id, &device) == -1, invalid);
+    CHECK(dev_close_device(d_ctx->ep_ctx, d_ctx->device_ctx, device) == -1);
+    CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_DEL, sizeof(random_id), &random_id) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+invalid:
+    ERR_LOG("");
+    return -2;
+}
+
 static int handler_rm_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)d_ctx;
     (void)stream;
     (void)stream_item;
+    if (d_ctx->type == DAEMON_SERVER) {
+        printf("err: server cannot remove devices\n");
+        stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+        return 0;
+    }
+    dev_path_arr devices = {};
+    devices.r.data = stream_item->payload.msg.buffer;
+    devices.r.size = sizeof(struct arg_device);
+    devices.r.length = stream_item->buffer_streamed / sizeof(struct arg_device);
     printf("rm\n");
+    for (size_t i = 0; i < devices.r.length; i++) {
+        struct arg_device device = {};
+        CHECK(u_array_getv(&devices.r, &device, i) == -1);
+        int ret = dyn_rm_dev(d_ctx, device.path);
+        CHECK(ret == -1);
+        if (ret == -2)
+            stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+    }
+    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL);
     return 0;
+err:
+    stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
+    ERR_LOG("");
+    return -1;
 }
 
 static int dyn_mod_dev(struct d_context* d_ctx, char* dev_path) {
-    CHECK_LBL(dev_path[0] == '\0', invalid);
-    char* endptr = {};
-    unsigned long random_id_long = strtoul(dev_path, &endptr, 10);
-    CHECK_LBL(endptr == dev_path || endptr[0] != '\0', invalid);
-    CHECK_LBL(random_id_long == ULONG_MAX, invalid);
-    CHECK_LBL(random_id_long > UINT16_MAX, invalid);
-    uint16_t random_id = (uint16_t)random_id_long;
-    struct device* device = {};
+    uint16_t random_id = 0;
+    CHECK_LBL(u_str_to_ushort(dev_path, &random_id) == -1, invalid);
     printf("id %d\n", random_id);
+    struct device* device = {};
     CHECK_LBL(dev_find_by_id(&d_ctx->device_ctx->devices, random_id, &device) == -1, invalid);
     enum device_ctrl ctrl = {};
     if (device->grabbed == true)
@@ -186,7 +216,7 @@ invalid:
 
 static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     if (d_ctx->type == DAEMON_SERVER) {
-        printf("err: server cannot add device\n");
+        printf("err: server cannot modify devices\n");
         stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
         return 0;
     }
@@ -199,10 +229,8 @@ static int handler_mod_dev(struct d_context* d_ctx, struct epoll_stream* stream,
         CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
         int ret = dyn_mod_dev(d_ctx, dev_path.path);
         CHECK(ret == -1);
-        if (ret == -2) {
+        if (ret == -2)
             stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_FAILURE, 0, NULL);
-            return 0;
-        }
     }
     stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL);
     return 0;

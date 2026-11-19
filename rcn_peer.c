@@ -38,7 +38,7 @@ err:
     return -1;
 }
 
-int p_close_peer(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
+int p_close_peer_naive(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
     (void)ep_ctx;
     p_ctx->peer_state = PEER_DISCONNECTED;
     LOG("peer closed connection");

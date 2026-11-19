@@ -17,6 +17,16 @@ err:
     return -1;
 }
 
+static int handler_dev_del(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
+    (void)stream;
+    uint16_t* random_id = stream_item->payload.msg.buffer;
+    CHECK(dev_close_device_by_id(d_ctx->ep_ctx, d_ctx->device_ctx, *random_id) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream;
     struct peer_msg_dev_upd_grab* msg = stream_item->payload.msg.buffer;
@@ -97,6 +107,10 @@ int peer_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct st
     switch (stream_item->payload.msg.header.value) {
         case PEER_HEADER_DEV_CRT: {
             CHECK(handler_dev_crt(d_ctx, stream, stream_item) == -1);
+            break;
+        }
+        case PEER_HEADER_DEV_DEL: {
+            CHECK(handler_dev_del(d_ctx, stream, stream_item) == -1);
             break;
         }
         case PEER_HEADER_DEV_UPD_GRAB: {

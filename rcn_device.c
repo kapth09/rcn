@@ -172,6 +172,36 @@ err:
     return -1;
 }
 
+int dev_close_device(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct device* device) {
+    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
+        struct device* tmp_device = {};
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&tmp_device, i) == -1);
+        if (tmp_device->info.random_id != device->info.random_id)
+            continue;
+        CHECK(e_epoll_close_remove_simple(ep_ctx, device->stream) == -1);
+        CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+int dev_close_device_by_id(struct epoll_context* ep_ctx, struct device_context* dev_ctx, uint16_t random_id) {
+    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
+        struct device* tmp_device = {};
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&tmp_device, i) == -1);
+        if (tmp_device->info.random_id != random_id)
+            continue;
+        CHECK(e_epoll_close_remove_simple(ep_ctx, tmp_device->stream) == -1);
+        CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+    }
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx) {
     while (dev_ctx->devices.r.length > 0) {
         struct device* dev = {};
@@ -310,10 +340,10 @@ int dev_find_by_id(device_arr* devices, uint16_t random_id, struct device** out_
             break;
         }
     }
-    if (found == false)
-        *out_dev = NULL;
+    CHECK(found == false);
     return 0;
 err:
+    *out_dev = NULL;
     ERR_LOG("");
     return -1;
 }
@@ -371,7 +401,7 @@ err:
     return -1;
 }
 
-int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream) {
+int dev_close_dev_naive(struct device_context* dev_ctx, struct epoll_stream* stream) {
     size_t index = TRY(u_array_find_index(&dev_ctx->devices.r, &stream), -1);
     CHECK(u_array_remove(&dev_ctx->devices.r, index) == -1);
     return 0;

@@ -1,5 +1,6 @@
 #include "include/rcn.h"
 #include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,20 @@
 #include <unistd.h>
 
 /* u_misc */
+int u_str_to_ushort(char* str, uint16_t* val) {
+    CHECK(str[0] == '\0');
+    char* endptr = {};
+    unsigned long random_id_long = strtoul(str, &endptr, 10);
+    CHECK(endptr == str || endptr[0] != '\0');
+    CHECK(random_id_long == ULONG_MAX);
+    CHECK(random_id_long > UINT16_MAX);
+    *val = (uint16_t)random_id_long;
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 void u_safe_free(void** ptr) {
     free(*ptr);
     *ptr = NULL;

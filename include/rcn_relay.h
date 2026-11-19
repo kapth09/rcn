@@ -54,7 +54,7 @@ struct relay_arg {
 /* rcn_relay.c */
 int r_init_usock(char* sock_path, size_t path_len);
 int r_connect_usock(char *sock_path, size_t path_len);
-int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream);
+int r_close_relay_naive(struct relay_context* r_ctx, struct epoll_stream* stream);
 int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
 int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx);
