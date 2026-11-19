@@ -1,4 +1,5 @@
 #include "include/rcn.h"
+#include "include/rcn_arg.h"
 #include "include/rcn_daemon.h"
 #include "include/rcn_device.h"
 #include "include/rcn_epoll.h"

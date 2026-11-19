@@ -18,20 +18,22 @@ static const char *relay_text[] = {
     [RELAY_HEADER_RESUME_AGAIN] = "already resumed",
     [RELAY_HEADER_STOP] = "stopped",
     [RELAY_HEADER_NO_PEER] = "no peer connected",
-    [RELAY_HEADER_DEV_CONFIG_SUCCESS] = "device configuration succeeded",
-    [RELAY_HEADER_DEV_CONFIG_FAILURE] = "device configuration failed",
 };
 
-static int request_list(struct stream_item *item) {
+static int request_default(struct stream_item *item, bool* stream_closed) {
+    *stream_closed = true;
+    LOG("%s", relay_text[item->payload.msg.header.value]);
+    return 0;
+}
+
+static int request_list(struct stream_item *item, bool* stream_closed) {
+    *stream_closed = true;
     if (item->payload.msg.header.size == 0) {
-        printf("\rrcn: no devices captured\n");
+        LOG("no devices captured");
         return 0;
     }
     relay_devices_list list = {};
-    list.r.size = sizeof(struct relay_data_list);
-    list.r.length = item->payload.msg.header.size / list.r.size;
-    list.r.data = item->payload.msg.buffer;
-    list.r.capacity = list.r.size * list.r.length;
+    u_array_from_stream_shallow(&list.r, item, sizeof(struct relay_data_list));
     for (size_t i = 0; i < list.r.length; i++) {
         struct relay_data_list *list_entry = {};
         CHECK(u_array_getr(&list.r, (void**)&list_entry, i) == -1);
@@ -48,14 +50,24 @@ err:
     return -1;
 }
 
+static int request_dev_config(struct stream_item* item, bool* stream_closed) {
+    *stream_closed = true;
+    CHECK(item->buffer_streamed != sizeof(struct relay_dev_config));
+    struct relay_dev_config* dev_config = item->payload.msg.buffer;
+    LOG("configured %d/%d devices", dev_config->count_success, dev_config->count_total);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 static void sig_sigint(int sig) {
     (void) sig;
-    printf("\r");
     LOG("got interrupted");
     exit(0);
 }
 
-static int handle_request(struct stream_item *item) {
+static int handle_request(struct stream_item *item, bool* stream_closed) {
     enum relay_msg_header header = item->payload.msg.header.value;
     switch (header) {
         case RELAY_HEADER_START:
@@ -64,11 +76,14 @@ static int handle_request(struct stream_item *item) {
         case RELAY_HEADER_RESUME:
         case RELAY_HEADER_RESUME_AGAIN:
         case RELAY_HEADER_NO_PEER:
-        case RELAY_HEADER_DEV_CONFIG_SUCCESS:
-        case RELAY_HEADER_DEV_CONFIG_FAILURE:
-        case RELAY_HEADER_STOP: printf("\rrcn: %s\n", relay_text[header]);
+        case RELAY_HEADER_STOP:
+            CHECK(request_default(item, stream_closed) == -1);
             break;
-        case RELAY_HEADER_LIST: request_list(item);
+        case RELAY_HEADER_LIST:
+            CHECK(request_list(item, stream_closed) == -1);
+            break;
+        case RELAY_HEADER_DEV_CONFIG:
+            CHECK(request_dev_config(item, stream_closed) == -1);
             break;
         default: goto err;
     }
@@ -119,8 +134,7 @@ int rcn_ctl(struct ctl_arg c_arg) {
                 continue;
             CHECK(stream_collect(stream, &item) == -1);
             if (item->op == STREAM_OP_READING) {
-                CHECK(handle_request(item) == -1);
-                stream_closed = true;
+                CHECK(handle_request(item, &stream_closed) == -1);
             }
             CHECK(e_epoll_reset_stream(&ep_ctx, stream) == -1);
         }

@@ -205,6 +205,15 @@ err:
     return -1;
 }
 
+/* This function maps a stream_item to a u_array, it doesn't allocate new memory, it just points into the buffer of the stream */
+int u_array_from_stream_shallow(struct u_array* arr, struct stream_item* stream_item, size_t size) {
+    arr->data = stream_item->payload.msg.buffer;
+    arr->size = size;
+    arr->length = stream_item->buffer_streamed / size;
+    arr->capacity = arr->size * arr->length;
+    return 0;
+}
+
 /* u_queue */
 int u_queue_init(struct u_queue* queue, size_t size, size_t capacity) {
     CHECK(u_array_init(&queue->data_array, size, capacity) == -1);

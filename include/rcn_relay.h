@@ -1,7 +1,6 @@
 #ifndef RCN_RCN_RELAY_H
 #define RCN_RCN_RELAY_H
 
-#include "rcn_arg.h"
 #include <linux/uinput.h>
 #include <signal.h>
 
@@ -25,8 +24,7 @@ enum relay_msg_header {
     RELAY_HEADER_ADD_DEV,
     RELAY_HEADER_RM_DEV,
     RELAY_HEADER_MOD_DEV,
-    RELAY_HEADER_DEV_CONFIG_SUCCESS,
-    RELAY_HEADER_DEV_CONFIG_FAILURE,
+    RELAY_HEADER_DEV_CONFIG,
 };
 
 struct relay_msg {
@@ -37,6 +35,11 @@ struct relay_data_list {
     char dev_name[UINPUT_MAX_NAME_SIZE];
     uint16_t random_id;
     bool grabbed;
+};
+
+struct relay_dev_config {
+    int count_success;
+    int count_total;
 };
 
 struct relay_context {

@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stdio.h>
 
+/* forwarde declaration */
+struct stream_item;
+
 struct u_array {
     void* data;
     size_t size; 	    // size of each element
@@ -43,6 +46,7 @@ int u_array_getr(struct u_array* arr, void** element, size_t i);
 int u_array_getv(struct u_array* arr, void* element, size_t i);
 ssize_t u_array_find_index(struct u_array* arr, void* element);
 int u_array_free(struct u_array* arr);
+int u_array_from_stream_shallow(struct u_array* arr, struct stream_item* stream_item, size_t size);
 
 /* rcn_util.c, u_queue */
 int u_queue_init(struct u_queue* queue, size_t size, size_t capacity);

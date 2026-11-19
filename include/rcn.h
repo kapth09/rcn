@@ -7,7 +7,7 @@
 
 extern enum debug_level g_debug_level;
 
-#define LOG(fmt, ...) fprintf(stdout, "rcn: " fmt "\n", ##__VA_ARGS__)
+#define LOG(fmt, ...) fprintf(stdout, "\rrcn: " fmt "\n", ##__VA_ARGS__)
 
 #define ERR_GOTO(label, ...) 					\
     do { 							            \
