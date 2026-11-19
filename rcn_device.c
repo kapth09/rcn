@@ -205,6 +205,7 @@ int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_
     msg.random_id = dev->info.random_id;
     msg.grab = dev->grabbed;
     size_t size = sizeof(struct peer_msg_dev_upd_grab);
+    printf("sending grab update %d\n", msg.grab);
     CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_UPD_GRAB, size, &msg) == -1);
     return 0;
 err:

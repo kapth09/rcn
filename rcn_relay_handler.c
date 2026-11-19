@@ -18,7 +18,7 @@ err:
 
 static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
-    if (d_ctx->state == RCN_PAUSED) {
+    if (d_ctx->state == RCN_STATE_PAUSED) {
         CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_PAUSE_AGAIN, 0, NULL) == -1);
         return 0;
     }
@@ -30,7 +30,7 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
     if (d_ctx->peer_ctx->peer_state == PEER_CONNECTED) {
         CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
         CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_PAUSE, 0, NULL) == -1);
-        d_ctx->state = RCN_PAUSED;
+        d_ctx->state = RCN_STATE_PAUSED;
     } else {
         CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_NO_PEER) == -1);
     }
@@ -42,7 +42,7 @@ err:
 
 static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     (void)stream_item;
-    if (d_ctx->state == RCN_RUNNING) {
+    if (d_ctx->state == RCN_STATE_RUNNING) {
         CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_RESUME_AGAIN, 0, NULL) == -1);
         return 0;
     }
@@ -51,7 +51,7 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
     else if (d_ctx->type == DAEMON_SERVER)
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_RESUME, 0, NULL) == -1);
-    d_ctx->state = RCN_RUNNING;
+    d_ctx->state = RCN_STATE_RUNNING;
     return 0;
 err:
     ERR_LOG("");
@@ -59,9 +59,9 @@ err:
 }
 
 static int handler_switch(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    if (d_ctx->state == RCN_RUNNING) {
+    if (d_ctx->state == RCN_STATE_RUNNING) {
         CHECK(handler_pause(d_ctx, stream, stream_item) == -1);
-    } else if (d_ctx->state == RCN_PAUSED) {
+    } else if (d_ctx->state == RCN_STATE_PAUSED) {
         CHECK(handler_resume(d_ctx, stream, stream_item) == -1);
     }
     return 0;
@@ -123,8 +123,11 @@ static int handler_add_dev(struct d_context* d_ctx, struct epoll_stream* stream,
         CHECK(u_array_getv(&devices.r, &dev_path, i) == -1);
         struct device* device = {};
         CHECK(dev_init_device(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, dev_path.path, &device) == -1);
-        CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_CAPTURE) == -1);
         CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, d_ctx->peer_ctx->peer_stream, PEER_HEADER_DEV_CRT, sizeof(struct device_info), &device->info) == -1);
+        if (d_ctx->state == RCN_STATE_PAUSED)
+            CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_RELEASE) == -1);
+        else if (d_ctx->state == RCN_STATE_RUNNING)
+            CHECK(dev_ctrl_device(d_ctx->ep_ctx, d_ctx->peer_ctx, device, DEV_CTRL_CAPTURE) == -1);
     }
     CHECK(stream_queue_writing_socket(d_ctx->ep_ctx, stream, RELAY_HEADER_DEV_CONFIG_SUCCESS, 0, NULL) == -1);
     return 0;
@@ -179,7 +182,6 @@ int relay_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct s
             CHECK(handler_list(d_ctx, stream, stream_item) == -1);
             break;
         }
-        // Add "grabbed" to device-info
         case RELAY_HEADER_ADD_DEV: {
             CHECK(handler_add_dev(d_ctx, stream, stream_item) == -1);
             break;

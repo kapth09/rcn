@@ -20,8 +20,8 @@ enum debug_level {
 };
 
 enum rcn_state {
-    RCN_RUNNING,
-    RCN_PAUSED,
+    RCN_STATE_RUNNING,
+    RCN_STATE_PAUSED,
 };
 
 enum fd_type {

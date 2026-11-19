@@ -35,11 +35,12 @@ static int request_list(struct stream_item *item) {
     for (size_t i = 0; i < list.r.length; i++) {
         struct relay_data_list *list_entry = {};
         CHECK(u_array_getr(&list.r, (void**)&list_entry, i) == -1);
-        printf("\rrcn:\t%d\t'%s'", list_entry->random_id, list_entry->dev_name);
+        printf("\rrcn:\t%d\t", list_entry->random_id);
         if (list_entry->grabbed)
-            printf("\t[grabbed]\n");
+            printf("[captured]\t");
         else
-            printf("\t[ungrabbed]\n");
+            printf("[released]\t");
+        printf("'%s'\n", list_entry->dev_name);
     }
     return 0;
 err:

@@ -23,6 +23,7 @@ static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* st
     struct device* dev = NULL;
     CHECK(dev_find_by_id(&d_ctx->device_ctx->devices, msg->random_id, &dev) == -1);
     dev->grabbed = msg->grab;
+    printf("updating grab of dev %d to %d\n", msg->random_id, msg->grab);
     return 0;
 err:
     ERR_LOG("");
@@ -49,7 +50,7 @@ static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, s
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
-    d_ctx->state = RCN_PAUSED;
+    d_ctx->state = RCN_STATE_PAUSED;
     return 0;
 err:
     ERR_LOG("");
@@ -65,7 +66,7 @@ static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, 
         CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
     epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
     CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
-    d_ctx->state = RCN_RUNNING;
+    d_ctx->state = RCN_STATE_RUNNING;
     return 0;
 err:
     ERR_LOG("");
@@ -80,7 +81,7 @@ static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, st
         CHECK(dev_init_device_ctx(d_ctx, NULL, DAEMON_SERVER) == -1);
         d_ctx->peer_ctx->isock_stream->fd = TRY(p_init_sock(d_ctx->peer_ctx->isock_port), -1);
         CHECK(p_init_peer_ctx(d_ctx->ep_ctx, d_ctx->peer_ctx, d_ctx->peer_ctx->isock_stream->fd, d_ctx->peer_ctx->isock_port, DAEMON_SERVER) == -1);
-        d_ctx->state = RCN_RUNNING;
+        d_ctx->state = RCN_STATE_RUNNING;
     } else if (d_ctx->type == DAEMON_CLIENT) {
         d_ctx->exit = true;
         epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
