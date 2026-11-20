@@ -72,8 +72,8 @@ static int resolve_host(const int port, const char *host, struct addrinfo** addr
     if (res != 0)
         goto err;
     return 0;
-    err:
-        errno = EHOSTUNREACH;
+err:
+    errno = EHOSTUNREACH;
     ERR_LOG(" %s", gai_strerror(res));
     return -1;
 }
@@ -94,7 +94,7 @@ int p_connect_sock(int port, char* host) {
             break;
         }
         CHECK(errno != ETIMEDOUT);
-        printf("rcn: timeout\n");
+        LOG("timeout");
     }
     freeaddrinfo(p_info);
     CHECK(connected == false);

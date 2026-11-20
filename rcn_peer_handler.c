@@ -33,7 +33,6 @@ static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* st
     struct device* dev = NULL;
     CHECK(dev_find_by_id(&d_ctx->device_ctx->devices, msg->random_id, &dev) == -1);
     dev->grabbed = msg->grab;
-    printf("updating grab of dev %d to %d\n", msg->random_id, msg->grab);
     return 0;
 err:
     ERR_LOG("");

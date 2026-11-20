@@ -173,6 +173,20 @@ err:
     return -1;
 }
 
+int dev_close_dev_naive(struct device_context* dev_ctx, struct epoll_stream* stream) {
+    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
+        struct device* dev = {};
+        CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, i) == -1);
+        if (dev->stream == stream) {
+            CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
+            return 0;
+        }
+    }
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 int dev_close_device(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct device* device) {
     for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
         struct device* tmp_device = {};
@@ -181,8 +195,6 @@ int dev_close_device(struct epoll_context* ep_ctx, struct device_context* dev_ct
             continue;
         CHECK(e_epoll_close_remove_simple(ep_ctx, device->stream) == -1);
         CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
-        if (tmp_device != dev_ctx->devices.r.data)
-            free(tmp_device);
     }
     return 0;
 err:
@@ -198,8 +210,6 @@ int dev_close_device_by_id(struct epoll_context* ep_ctx, struct device_context* 
             continue;
         CHECK(e_epoll_close_remove_simple(ep_ctx, tmp_device->stream) == -1);
         CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
-        if (tmp_device != dev_ctx->devices.r.data)
-            free(tmp_device);
     }
     return 0;
 err:
@@ -210,10 +220,8 @@ err:
 int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx) {
     for (ssize_t i = (ssize_t)dev_ctx->devices.r.length-1; i > 1; i--) {
         struct device* dev = {};
-        printf("i %zu\n", i);
         CHECK(u_array_getr(&dev_ctx->devices.r, (void**)&dev, i) == -1);
         CHECK(e_epoll_close_remove_simple(ep_ctx, dev->stream) == -1);
-        free(dev);
     }
     free(dev_ctx->devices.r.data);
     return 0;
@@ -241,7 +249,6 @@ int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_
     msg.random_id = dev->info.random_id;
     msg.grab = dev->grabbed;
     size_t size = sizeof(struct peer_msg_dev_upd_grab);
-    printf("sending grab update %d\n", msg.grab);
     CHECK(stream_queue_writing_socket(ep_ctx, p_ctx->peer_stream, PEER_HEADER_DEV_UPD_GRAB, size, &msg) == -1);
     return 0;
 err:
@@ -403,20 +410,6 @@ int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices)
         CHECK(dev_release_virt_keys(ep_ctx, dev) == -1);
     }
     return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-int dev_close_dev_naive(struct device_context* dev_ctx, struct epoll_stream* stream) {
-    for (size_t i = 0; i < dev_ctx->devices.r.length; i++) {
-        struct device* dev = {};
-        CHECK(u_array_getv(&dev_ctx->devices.r, &dev, i) == -1);
-        if (dev->stream == stream) {
-            CHECK(u_array_remove(&dev_ctx->devices.r, i) == -1);
-            return 0;
-        }
-    }
 err:
     ERR_LOG("");
     return -1;

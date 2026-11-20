@@ -158,7 +158,6 @@ err:
 static int dyn_rm_dev(struct d_context* d_ctx, char* dev_path) {
     uint16_t random_id = 0;
     CHECK_LBL(u_str_to_ushort(dev_path, &random_id) == -1, invalid);
-    printf("id %d\n", random_id);
     struct device* device = {};
     CHECK_LBL(dev_find_by_id(&d_ctx->device_ctx->devices, random_id, &device) == -1, invalid);
     CHECK(dev_close_device(d_ctx->ep_ctx, d_ctx->device_ctx, device) == -1);
@@ -202,7 +201,6 @@ err:
 static int dyn_mod_dev(struct d_context* d_ctx, char* dev_path) {
     uint16_t random_id = 0;
     CHECK_LBL(u_str_to_ushort(dev_path, &random_id) == -1, invalid);
-    printf("id %d\n", random_id);
     struct device* device = {};
     CHECK_LBL(dev_find_by_id(&d_ctx->device_ctx->devices, random_id, &device) == -1, invalid);
     enum device_ctrl ctrl = {};
@@ -248,45 +246,36 @@ err:
 
 int relay_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
     switch (stream_item->payload.msg.header.value) {
-        case RELAY_HEADER_IDLE: {
+        case RELAY_HEADER_IDLE:
             // do nothing so the relay hangs on read()
             break;
-        }
-        case RELAY_HEADER_START: {
+        case RELAY_HEADER_START:
             CHECK(handler_start(d_ctx, stream, stream_item) == -1);
             break;
-        } case RELAY_HEADER_PAUSE: {
+        case RELAY_HEADER_PAUSE:
             CHECK(handler_pause(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_RESUME: {
+        case RELAY_HEADER_RESUME:
             CHECK(handler_resume(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_STOP: {
+        case RELAY_HEADER_STOP:
             CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_SWITCH: {
+        case RELAY_HEADER_SWITCH:
             CHECK(handler_switch(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_LIST: {
+        case RELAY_HEADER_LIST:
             CHECK(handler_list(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_ADD_DEV: {
+        case RELAY_HEADER_ADD_DEV:
             CHECK(handler_add_dev(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_RM_DEV: {
+        case RELAY_HEADER_RM_DEV:
             CHECK(handler_rm_dev(d_ctx, stream, stream_item) == -1);
             break;
-        }
-        case RELAY_HEADER_MOD_DEV: {
+        case RELAY_HEADER_MOD_DEV:
             CHECK(handler_mod_dev(d_ctx, stream, stream_item) == -1);
             break;
-        }
         default: ERR_GOTO(err, "err: unknown relay header '%d'\n", stream_item->payload.msg.header.value);
     }
     return 0;
