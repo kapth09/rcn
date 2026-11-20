@@ -12,6 +12,9 @@ static char* subactions[SUBACTION_COUNT] = {
     [SUBACTION_LOG]     = ARG_SUBACTION_LOG,
     [SUBACTION_LIST]    = ARG_SUBACTION_LIST,
     [SUBACTION_LS]      = ARG_SUBACTION_LS,
+    [SUBACTION_ADD]     = ARG_SUBACTION_ADD,
+    [SUBACTION_RM]      = ARG_SUBACTION_RM,
+    [SUBACTION_MOD]     = ARG_SUBACTION_MOD,
 };
 static const int subactions_length = sizeof(subactions) / sizeof(subactions[0]);
 
@@ -28,6 +31,9 @@ static const struct arg_help_data help_data[] = {
     {ARG_SUBACTION_LOG, ARG_HELP_SUBACTION_LOG},
     {ARG_SUBACTION_LIST, ARG_HELP_SUBACTION_LIST},
     {ARG_SUBACTION_LS, ARG_HELP_SUBACTION_LIST},
+    {ARG_SUBACTION_ADD, ARG_HELP_SUBACTION_ADD},
+    {ARG_SUBACTION_RM, ARG_HELP_SUBACTION_RM},
+    {ARG_SUBACTION_MOD, ARG_HELP_SUBACTION_MOD},
 };
 static const int help_data_length = sizeof(help_data) / sizeof(help_data[0]);
 
@@ -44,6 +50,9 @@ static const struct arg_handler handlers[] = {
     {ARG_SUBACTION_SWITCH, ARG_SUBACTION_SWITCH, arg_daemon},
     {ARG_SUBACTION_LOG, ARG_SUBACTION_LOG, arg_daemon},
     {ARG_SUBACTION_LS, ARG_SUBACTION_LIST, arg_daemon},
+    {ARG_SUBACTION_ADD, ARG_SUBACTION_ADD, arg_daemon},
+    {ARG_SUBACTION_RM, ARG_SUBACTION_RM, arg_daemon},
+    {ARG_SUBACTION_MOD, ARG_SUBACTION_MOD, arg_daemon},
 };
 static const int handlers_length = sizeof(handlers) / sizeof(handlers[0]);
 
@@ -65,32 +74,18 @@ static void print_help() {
     printf("\n\t%s\t\t%s", ARG_SUBACTION_SWITCH, ARG_DESC_SUBACTION_SWITCH);
     printf("\n\t%s\t\t%s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
     printf("\n\t%s\t\t%s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_ADD, ARG_DESC_SUBACTION_ADD);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_RM, ARG_DESC_SUBACTION_RM);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_MOD, ARG_DESC_SUBACTION_MOD);
     printf("\n\n");
 
     printf("Flags:\n");
     printf("\t%s/%s\t%s\n", ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, ARG_DESC_FLAG_PORT);
-    printf("\t\t\tAvailable for actions:\n");
-    printf("\t\t\t\t%s, %s", ARG_ACTION_START, ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_SHOW);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
-    printf("\t\t\tPossible values are:\n");
-    printf("\t\t\t\t<(sub)action>");
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
-    printf("\t\t\tAvailability:\n");
-    printf("\t\t\t\tAlways");
+    printf("\t%s/%s\t%s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
     printf("\n");
 }
 
@@ -167,12 +162,12 @@ err:
 int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
     if (*i + 1 >= argc)
         EARG_MISSING_VALUE(ARG_FLAG_DEVICES);
-    if (ctx->devices.info.needed == false)
+    if (ctx->devices.info.needed == false && ctx->devices.info.optional == false)
         EARG_WRONG_FLAG(ARG_FLAG_DEVICES);
     if (ctx->devices.info.provided == true)
         EARG_FLAG_AGAIN(ARG_FLAG_DEVICES);
-    char_arr* dev_arr = &ctx->devices.val.v_char_arr;
-    CHECK(u_array_init(&dev_arr->r, sizeof(char*), RCN_STD_CAPACITY) == -1);
+    dev_path_arr* dev_arr = &ctx->devices.val.v_path_arr;
+    CHECK(u_array_init(&dev_arr->r, sizeof(struct arg_device), RCN_STD_CAPACITY) == -1);
     (*i)++;
     for (; *i < argc; (*i)++) {
         char* arg = argv[*i];
@@ -182,7 +177,14 @@ int arg_devices(int argc, char** argv, int* i, struct arg_context* ctx) {
                 goto end;
             }
         }
-        u_array_add(&dev_arr->r, &arg);
+        struct arg_device dev = {};
+        size_t path_len = strlen(arg);
+        if (path_len >= sizeof(dev.path))
+            ERR_GOTO(err, "err: device path '%s' is too long (%zu characters), max: %zu\n", arg, path_len, sizeof(dev.path));
+        memcpy(dev.path, arg, path_len);
+        CHECK(u_array_add(&dev_arr->r, &dev) == -1);
+        struct arg_device c = {};
+        CHECK(u_array_getv(&dev_arr->r, &c, dev_arr->r.length-1) == -1);
     }
 end:
     ctx->devices.info.provided = true;
@@ -230,24 +232,25 @@ err:
 }
 
 int arg_daemon(int argc, char** argv, int* i, struct arg_context* ctx) {
+    (void)argc;
     if (ctx->daemon.info.needed == false)
         EARG_WRONG_SUBACTION(argv[*i]);
     if (ctx->daemon.info.provided == true)
         EARG_SUBACTION_AGAIN(argv[*i]);
-    for (; *i < argc; (*i)++) {
-        const char* arg = argv[*i];
-        bool found_subaction = false;
-        for (int j = 0; j < subactions_length; j++) {
-            if (strcmp(arg, subactions[j]) == 0) {
-                ctx->daemon.val.saction = j;
-                found_subaction = true;
-                break;
-            }
-        }
-        if (found_subaction == false) {
-            ERR_LOG("unkown subaction '%s'", arg);
-            goto err;
-        }
+    const char* arg = argv[*i];
+    bool found_subaction = false;
+    for (int j = 0; j < subactions_length; j++) {
+        if (strcmp(arg, subactions[j]) != 0)
+            continue;
+        ctx->daemon.val.saction = j;
+        found_subaction = true;
+        if (j == SUBACTION_ADD || j == SUBACTION_RM || j == SUBACTION_MOD)
+            ctx->devices.info.needed = true;
+        break;
+    }
+    if (found_subaction == false) {
+        ERR_LOG("unkown subaction '%s'", arg);
+        goto err;
     }
     ctx->daemon.info.provided = true;
     return 0;
@@ -317,6 +320,9 @@ int subaction_to_rcn_msg(enum subaction_type saction) {
         case SUBACTION_LIST: return RELAY_HEADER_LIST;
         case SUBACTION_LS: return RELAY_HEADER_LIST;
         case SUBACTION_SWITCH: return RELAY_HEADER_SWITCH;
+        case SUBACTION_ADD: return RELAY_HEADER_ADD_DEV;
+        case SUBACTION_RM: return RELAY_HEADER_RM_DEV;
+        case SUBACTION_MOD: return RELAY_HEADER_MOD_DEV;
         default:
             DEBUG_LOG("");
             return -1;

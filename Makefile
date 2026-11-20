@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=gnu2x
-SRCS = ./rcn.c ./rcn_daemon.c ./rcn_epoll.c ./rcn_relay.c ./rcn_util.c ./rcn_arg.c ./rcn_device.c ./rcn_peer.c ./rcn_stream.c
+SRCS = *.c
 TARGET = rcn
 
 default: CFLAGS += -g
@@ -20,5 +20,9 @@ uninstall:
 
 clean:
 	rm -f $(TARGET)
+
+asan: CFLAGS += -fsanitize=address
+asan:
+	$(CC) $(SRCS) $(CFLAGS) -o $(TARGET)
 
 .PHONY: default clean

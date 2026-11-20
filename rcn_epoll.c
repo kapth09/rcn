@@ -30,15 +30,23 @@ err:
     return -1;
 }
 
-int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream) {
-    struct epoll_stream* stream= TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
-    stream->fd_type= type;
-    CHECK(stream_init(stream, fd, type) == -1);
+int e_epoll_add_stream(struct epoll_context* ep_ctx, struct epoll_stream* stream) {
     CHECK(u_array_add(&ep_ctx->stream_ptrs.r, &stream) == -1);
     struct epoll_event u_evt = {};
     u_evt.events = EPOLLIN;
     u_evt.data.ptr = stream;
-    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, fd, &u_evt) == -1);
+    CHECK(epoll_ctl(ep_ctx->epoll_fd, EPOLL_CTL_ADD, stream->fd, &u_evt) == -1);
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+int e_epoll_add_getr(struct epoll_context* ep_ctx, int fd, enum fd_type type, struct epoll_stream** out_stream) {
+    struct epoll_stream* stream= TRY(calloc(1, sizeof(struct epoll_stream)), NULL);
+    stream->fd_type = type;
+    CHECK(stream_init(stream, fd, type) == -1);
+    CHECK(e_epoll_add_stream(ep_ctx, stream) == -1);
     *out_stream = stream;
     return 0;
 err:
@@ -94,9 +102,9 @@ err:
 
 int e_epoll_close_remove(struct d_context* d_ctx, struct epoll_stream* stream) {
     switch (stream->fd_type) {
-        case FD_RELAY: r_close_relay(d_ctx->relay_ctx, stream); break;
-        case FD_DEV: dev_close_dev(d_ctx->device_ctx, stream); break;
-        case FD_PEER: p_close_peer(d_ctx->ep_ctx, d_ctx->peer_ctx); break;
+        case FD_RELAY: CHECK(r_close_relay_naive(d_ctx->relay_ctx, stream) == -1); break;
+        case FD_DEV: CHECK(dev_close_dev_naive(d_ctx->device_ctx, stream) == -1); break;
+        case FD_PEER: CHECK(p_close_peer_naive(d_ctx->ep_ctx, d_ctx->peer_ctx) == -1); break;
         default: ERR_GOTO(err, "err: unknown fd_type\n");
     }
     CHECK(e_epoll_close_remove_simple(d_ctx->ep_ctx, stream) == -1);

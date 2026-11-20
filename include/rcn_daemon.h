@@ -3,6 +3,7 @@
 
 #include "rcn_device.h"
 #include "rcn_relay.h"
+#include "rcn_ctl.h"
 
 #define DAEMON_STATUS_OK INT64_MAX
 
@@ -20,16 +21,15 @@ struct daemon_arg {
     int evtfd;
     int port;
     char* host;
-    char_arr* devices_arg;
+    dev_path_arr* devices_arg;
     enum daemon_type type;
 };
 
 /* rcn_daemon.c */
 int d_init_dir();
 int d_init_log(enum daemon_type d_type);
-int d_init_inet_sock(int port);
 int d_print_log(enum daemon_type d_type);
-int d_fork(struct d_context* d_ctx, struct relay_arg r_arg);
-int daemon_start(struct daemon_arg d_arg, struct relay_arg r_arg);
+int d_fork(struct d_context* d_ctx, struct ctl_arg r_arg);
+int daemon_start(struct daemon_arg d_arg, struct ctl_arg r_arg);
 
 #endif //RCN_RCN_DAEMON_H

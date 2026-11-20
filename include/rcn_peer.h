@@ -3,33 +3,27 @@
 
 #include "rcn_device.h"
 
+/* forward declaration */
 struct d_context;
 
 enum peer_msg_header {
-    PEER_HEADER_DEV_CRT,
-    PEER_HEADER_DEV_UPD_GRAB,
+    PEER_HEADER_DEV_CRT,        // sends a single struct device_info
+    PEER_HEADER_DEV_DEL,        // sends a single random_id of a device
+    PEER_HEADER_DEV_UPD_GRAB,   // sends a single struct peer_msg_dev_upd_grab
     PEER_HEADER_EVENT,
     PEER_HEADER_PAUSE,
     PEER_HEADER_RESUME,
     PEER_HEADER_STOP,
 };
 
-struct peer_msg_dev_crt {
-    struct device dev;
-};
-
-struct peer_msg_dev_del {
-    size_t random_id;
-};
-
 struct peer_msg_dev_upd_grab {
-    size_t random_id;
+    uint16_t random_id;
     bool grab;
 };
 
 struct peer_msg_event {
     struct input_event evt_data;
-    size_t random_id;
+    uint16_t random_id;
 };
 
 enum peer_state {
@@ -45,9 +39,10 @@ struct peer_context {
     enum peer_state peer_state;
 };
 
-int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
 int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, int port, enum daemon_type d_type);
 int p_close_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
-int p_close_peer(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
+int p_close_peer_naive(struct epoll_context* ep_ctx, struct peer_context* p_ctx);
+int p_connect_sock(int port, char* host);
+int p_init_sock(int port);
 
 #endif //RCN_RCN_PEER_H

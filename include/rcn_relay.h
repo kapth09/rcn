@@ -2,6 +2,7 @@
 #define RCN_RCN_RELAY_H
 
 #include <linux/uinput.h>
+#include <signal.h>
 
 #define DEFAULT_USOCK_COUNT 3
 #define RELAY_SLEEP_TIMEOUT 5
@@ -20,6 +21,10 @@ enum relay_msg_header {
     RELAY_HEADER_STOP,
     RELAY_HEADER_SWITCH,
     RELAY_HEADER_LIST,
+    RELAY_HEADER_ADD_DEV,
+    RELAY_HEADER_RM_DEV,
+    RELAY_HEADER_MOD_DEV,
+    RELAY_HEADER_DEV_CONFIG,
 };
 
 struct relay_msg {
@@ -28,14 +33,13 @@ struct relay_msg {
 
 struct relay_data_list {
     char dev_name[UINPUT_MAX_NAME_SIZE];
+    uint16_t random_id;
     bool grabbed;
 };
 
-struct relay_arg {
-    enum relay_msg_header header_sent;
-    enum daemon_type d_type;
-    bool check_daemon_status;
-    int evtfd;
+struct relay_dev_config {
+    int count_success;
+    int count_total;
 };
 
 struct relay_context {
@@ -43,15 +47,20 @@ struct relay_context {
     int usock_fd;
 };
 
-typedef typeof(int(struct relay_arg arg)) *r_handler_t;
+struct relay_arg {
+    __sighandler_t sighandler;
+    int evt_fd;
+    bool check_daemon;
+    enum daemon_type d_type;
+};
 
 /* rcn_relay.c */
 int r_init_usock(char* sock_path, size_t path_len);
-int relay_start(struct relay_arg arg);
-int r_close_relay(struct relay_context* r_ctx, struct epoll_stream* stream);
-int r_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
+int r_connect_usock(char *sock_path, size_t path_len);
+int r_close_relay_naive(struct relay_context* r_ctx, struct epoll_stream* stream);
 int r_broadcast_relay_header(struct epoll_context* ep_ctx, epoll_stream_arr* relay_streams, enum relay_msg_header);
 int r_init_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx, int usock_fd);
 int r_close_relay_ctx(struct epoll_context* ep_ctx, struct relay_context* r_ctx);
+int relay_start(struct epoll_stream* relay_stream, struct relay_arg r_arg);
 
 #endif //RCN_RCN_RELAY_H

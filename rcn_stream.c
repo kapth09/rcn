@@ -187,13 +187,14 @@ int stream_stream(struct epoll_stream* stream) {
     stream_item->buffer_streamed += streamed;
     CHECK(stream_item->buffer_streamed > stream_info.size_total);
     if (stream_item->buffer_streamed == stream_info.size_total) {
-        stream_item->buffer_streamed = 0;
         if (stream_item->type == STREAM_TYPE_DEVICE)
             stream_item->state = STREAM_STREAMING_COMPLETE;
         if (stream_item->state == STREAM_STREAMING_BODY || (stream_item->type == STREAM_TYPE_SOCKET && stream_item->payload.msg.header.size == 0))
             stream_item->state = STREAM_STREAMING_COMPLETE;
-        else if (stream_item->state == STREAM_STREAMING_HEADER)
+        else if (stream_item->state == STREAM_STREAMING_HEADER) {
+            stream_item->buffer_streamed = 0;
             stream_item->state = STREAM_STREAMING_BODY;
+        }
     }
     return 0;
 err:
@@ -204,9 +205,8 @@ err:
 
 int stream_collect(struct epoll_stream* stream, struct stream_item** stream_data) {
     *stream_data = &stream->fallback;
-    if (stream->queue.r.is_empty == false) {
+    if (stream->queue.r.is_empty == false)
         CHECK(u_queue_pop(&stream->queue.r, *stream_data) == -1);
-    }
     if (stream->queue.r.is_empty == true)
         stream->next = &stream->fallback;
     else

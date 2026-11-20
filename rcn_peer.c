@@ -1,130 +1,12 @@
 #include "include/rcn.h"
-#include "include/rcn_daemon.h"
 #include "include/rcn_epoll.h"
 #include "include/rcn_peer.h"
 #include "include/rcn_stream.h"
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
 #include <string.h>
-#include <sys/epoll.h>
-#include <unistd.h>
-
-static int handler_dev_crt(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)stream;
-    struct device_info* new_dev = stream_item->payload.msg.buffer;
-    CHECK(dev_init_udev(d_ctx->ep_ctx, &d_ctx->device_ctx->devices, new_dev) == -1);
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static int handler_dev_upd_grab(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)stream;
-    struct peer_msg_dev_upd_grab* msg = stream_item->payload.msg.buffer;
-    struct device* dev = NULL;
-    CHECK(dev_find_by_id(&d_ctx->device_ctx->devices, msg->random_id, &dev) == -1);
-    dev->grabbed = msg->grab;
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static int handler_event(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)stream;
-    struct peer_msg_event msg = *(struct peer_msg_event*)stream_item->payload.msg.buffer;
-    CHECK(dev_emit_event_msg(d_ctx, msg) == -1);
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-static int handler_pause(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    if (d_ctx->type == DAEMON_CLIENT)
-        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, d_ctx->peer_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_RELEASE) == -1);
-    else if (d_ctx->type == DAEMON_SERVER)
-        CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
-    epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-    CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_PAUSE) == -1);
-    d_ctx->state = RCN_PAUSED;
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-static int handler_resume(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    if (d_ctx->type == DAEMON_CLIENT)
-        CHECK(dev_ctrl_devices(d_ctx->ep_ctx, d_ctx->peer_ctx, &d_ctx->device_ctx->devices, DEV_CTRL_CAPTURE) == -1);
-    else if (d_ctx->type == DAEMON_SERVER)
-        CHECK(dev_release_virt_keys_all(d_ctx->ep_ctx, &d_ctx->device_ctx->devices) == -1);
-    epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-    CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_RESUME) == -1);
-    d_ctx->state = RCN_RUNNING;
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-static int handler_stop(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    (void)d_ctx;
-    (void)stream;
-    (void)stream_item;
-    if (d_ctx->type == DAEMON_SERVER) {
-        CHECK(dev_close_device_ctx(d_ctx->ep_ctx, d_ctx->device_ctx) == -1);
-        CHECK(dev_init_device_ctx(d_ctx, NULL, DAEMON_SERVER) == -1);
-        d_ctx->peer_ctx->isock_stream->fd = TRY(d_init_inet_sock(d_ctx->peer_ctx->isock_port), -1);
-        CHECK(p_init_peer_ctx(d_ctx->ep_ctx, d_ctx->peer_ctx, d_ctx->peer_ctx->isock_stream->fd, d_ctx->peer_ctx->isock_port, DAEMON_SERVER) == -1);
-        d_ctx->state = RCN_RUNNING;
-    } else if (d_ctx->type == DAEMON_CLIENT) {
-        d_ctx->exit = true;
-        epoll_stream_arr* relay_streams = &d_ctx->relay_ctx->relay_streams;
-        CHECK(r_broadcast_relay_header(d_ctx->ep_ctx, relay_streams, RELAY_HEADER_STOP) == -1);
-    }
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
-
-int p_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item) {
-    switch (stream_item->payload.msg.header.value) {
-        case PEER_HEADER_DEV_CRT: {
-            CHECK(handler_dev_crt(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_DEV_UPD_GRAB: {
-            CHECK(handler_dev_upd_grab(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_EVENT: {
-            CHECK(handler_event(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_PAUSE: {
-            CHECK(handler_pause(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_RESUME: {
-            CHECK(handler_resume(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        case PEER_HEADER_STOP: {
-            CHECK(handler_stop(d_ctx, stream, stream_item) == -1);
-            break;
-        }
-        default: ERR_GOTO(err, "err: unknown peer header '%d'\n", stream_item->payload.msg.header.value);
-    }
-    return 0;
-err:
-    ERR_LOG("");
-    return -1;
-}
 
 int p_init_peer_ctx(struct epoll_context* ep_ctx, struct peer_context* p_ctx, int isock_fd, int port, enum daemon_type d_type) {
     p_ctx->isock_port = port;
@@ -156,9 +38,71 @@ err:
     return -1;
 }
 
-int p_close_peer(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
+int p_close_peer_naive(struct epoll_context* ep_ctx, struct peer_context* p_ctx) {
     (void)ep_ctx;
     p_ctx->peer_state = PEER_DISCONNECTED;
     LOG("peer closed connection");
     return 0;
+}
+
+int p_init_sock(int port) {
+    const int isock_fd = TRY(socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0), -1);
+    const int reuse = 1;
+    CHECK(setsockopt(isock_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1);
+    struct sockaddr_in s_iaddr = {};
+    s_iaddr.sin_family = AF_INET;
+    s_iaddr.sin_port = htons(port);
+    s_iaddr.sin_addr.s_addr = INADDR_ANY;
+    CHECK(bind(isock_fd, (struct sockaddr*)&s_iaddr, sizeof(s_iaddr)) == -1);
+    CHECK(listen(isock_fd, 0) == -1);
+    LOG("listening on port %d", port);
+    return isock_fd;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
+static int resolve_host(const int port, const char *host, struct addrinfo** addr) {
+    char port_str[6];
+    snprintf(port_str, sizeof(port_str), "%d", port);
+    struct addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    int res = getaddrinfo(host, port_str, &hints, addr);
+    if (res != 0)
+        goto err;
+    return 0;
+err:
+    errno = EHOSTUNREACH;
+    ERR_LOG(" %s", gai_strerror(res));
+    return -1;
+}
+
+int p_connect_sock(int port, char* host) {
+    const int isock_fd = TRY(socket(AF_INET, SOCK_STREAM, 0), -1);
+    const int timeout_ms = RCN_CONN_TIMEOUT_MS;
+    CHECK(setsockopt(isock_fd, IPPROTO_TCP, TCP_USER_TIMEOUT, &timeout_ms, sizeof(timeout_ms)) == -1);
+    const int no_delay = 1;
+    CHECK(setsockopt(isock_fd, SOL_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay)) == -1);
+    struct addrinfo* p_info = NULL;
+    CHECK(resolve_host(port, host, &p_info) == -1);
+    bool connected = false;
+    for (struct addrinfo* i = p_info; i != NULL; i = i->ai_next) {
+        int res = connect(isock_fd, i->ai_addr, i->ai_addrlen);
+        if (res == 0) {
+            connected = true;
+            break;
+        }
+        CHECK(errno != ETIMEDOUT);
+        LOG("timeout");
+    }
+    freeaddrinfo(p_info);
+    CHECK(connected == false);
+    int fd_flags = TRY(fcntl(isock_fd, F_GETFL, 0), -1);
+    CHECK(fcntl(isock_fd, F_SETFL, O_NONBLOCK | fd_flags) == -1);
+    LOG("connected to server %s", host);
+    return isock_fd;
+err:
+    ERR_LOG("");
+    return -1;
 }

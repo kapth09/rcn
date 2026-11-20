@@ -36,7 +36,7 @@ struct device_info {
     char name[UINPUT_MAX_NAME_SIZE];
     struct input_absinfo absinfo[ABS_MAX+1];
     struct input_id dev_id;
-    size_t random_id;
+    uint16_t random_id;
 };
 
 struct device {
@@ -63,21 +63,24 @@ extern const int device_evt_val_arr[];
 extern const char* device_evt_str_arr[DEVICE_EVT_COUNT_INDEX];
 extern const int device_evt_str_length;
 
-int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, char_arr* dev_paths);
+int dev_init_devices_arg(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct peer_context* p_ctx, dev_path_arr* dev_paths);
 int dev_init_device(struct epoll_context* ep_ctx, device_arr* devices, const char *dev_path, struct device** out_dev);
-int dev_init_device_ctx(struct d_context* d_ctx, char_arr* devices_arg, enum daemon_type type);
+int dev_init_device_ctx(struct d_context* d_ctx, dev_path_arr* devices_arg, enum daemon_type type);
 int dev_get_all_devices(basic_dev_info_arr* dev_binfos, enum event_types filter);
 int dev_print_basic_info(struct basic_device_info binfo);
-int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_grab_device_by_ptr(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_get_device_info(int dev_fd, struct device* dev);
-int dev_find_by_id(device_arr* devices, size_t random_id, struct device** out_dev);
+int dev_find_by_id(device_arr* devices, uint16_t random_id, struct device** out_dev);
 int dev_init_udev(struct epoll_context* ep_ctx, device_arr* devices, struct device_info* info_template);
-int dev_close_dev(struct device_context* dev_ctx, struct epoll_stream* stream);
+int dev_close_dev_naive(struct device_context* dev_ctx, struct epoll_stream* stream);
+int dev_close_device(struct epoll_context* ep_ctx, struct device_context* dev_ctx, struct device* device);
+int dev_close_device_by_id(struct epoll_context* ep_ctx, struct device_context* dev_ctx, uint16_t random_id);
+int dev_close_device_ctx(struct epoll_context* ep_ctx, struct device_context* dev_ctx);
 int dev_handler(struct d_context* d_ctx, struct epoll_stream* stream, struct stream_item* stream_item);
 int dev_emit_event_msg(struct d_context* d_ctx, struct peer_msg_event event);
 int dev_release_virt_keys(struct epoll_context* ep_ctx, struct device* device);
 int dev_release_virt_keys_all(struct epoll_context* ep_ctx, device_arr* devices);
+int dev_ctrl_device(struct epoll_context* ep_ctx, struct peer_context* p_ctx, struct device* dev, enum device_ctrl ctrl);
 int dev_ctrl_devices(struct epoll_context* ep_ctx, struct peer_context* p_ctx, device_arr* devices, enum device_ctrl ctrl);
 
 #endif //RCN_RCN_DEV_H

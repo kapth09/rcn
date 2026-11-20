@@ -16,6 +16,9 @@
 #define ARG_SUBACTION_LOG       "log"
 #define ARG_SUBACTION_LIST      "list"
 #define ARG_SUBACTION_LS        "ls"
+#define ARG_SUBACTION_ADD       "add"
+#define ARG_SUBACTION_RM        "rm"
+#define ARG_SUBACTION_MOD       "mod"
 
 #define ARG_DESC_ACTION_START       "Start the server, on the given port, in the background"
 #define ARG_DESC_ACTION_CONNECT     "Connect to the given server and capture the list of devices"
@@ -29,6 +32,9 @@
 #define ARG_DESC_SUBACTION_SWITCH  "Switch betwen paused/running state"
 #define ARG_DESC_SUBACTION_LOG     "Print the logs to stdout"
 #define ARG_DESC_SUBACTION_LIST    "List captured devices"
+#define ARG_DESC_SUBACTION_ADD     "Add listed devices to the rcn context"
+#define ARG_DESC_SUBACTION_RM      "Remove listed devices by id from the rcn context"
+#define ARG_DESC_SUBACTION_MOD     "Modify the grab state of the listed devices by id"
 
 #define ARG_FLAG_PORT 	        "-p"
 #define ARG_FLAG_LONG_PORT      "--port"
@@ -48,10 +54,10 @@
 #define ARG_FILTER_EVT_ABS      DEVICE_EVT_ABS_STR
 #define ARG_FILTER_EVT_SWT      DEVICE_EVT_SWT_STR
 
-#define ARG_DESC_FLAG_PORT      "Port on which to listen on/connect to"
-#define ARG_DESC_FLAG_HOST      "Hostname/ip-address of the server"
+#define ARG_DESC_FLAG_PORT      "Port to listen on/connect to"
+#define ARG_DESC_FLAG_HOST      "Hostname/IP-address of the server"
 #define ARG_DESC_FLAG_DEVICES   "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
-#define ARG_DESC_FLAG_HELP      "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
+#define ARG_DESC_FLAG_HELP      "Print the help for rcn. A list of (sub)actions can be supplied for more detailed infos"
 #define ARG_DESC_FLAG_DEBUG     "Print extra debug information in the log, should be the first argument"
 #define ARG_DESC_FLAG_FILTER    "Filter devices by event type"
 
@@ -83,6 +89,12 @@
 #define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
                                     "If --debug is set, more info is available."
 #define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not. 'list' and 'ls' are the equivalent."
+#define ARG_HELP_SUBACTION_ADD      "Add the listed devices to the rcn context. If the rcn context is not paused, the devices are instantly captured.\n\t" \
+                                    "rcn add -d /dev/input/eventX"
+#define ARG_HELP_SUBACTION_RM       "Remove the listed devices by ID from the rcn context. Use 'list' to see the ID.\n\t" \
+                                    "rcn rm -d <id>"
+#define ARG_HELP_SUBACTION_MOD      "Apply the 'switch' subaction to the listed devices, by ID. Use 'list' to see the ID.\n\t" \
+                                    "rcn mod -d <id>"
 
 #define ARG_HELP_RCN_DESC   "rcn is a tool to send inputs from eventX files and replay them on the server via a uinput virtual device.\n\t" \
                             "The server is started via 'start', the client connects via 'connect'\n\t" \
@@ -90,6 +102,8 @@
                             "If either 'server' or 'client' is specified when running a subaction, the subaction is sent to the corresponding daemon.\n\t" \
                             "If not, a 'auto-subaction' is performed. It automactially checks which daemon is running and sends the subaction to it.\n\t" \
                             "It both server and client are running on the same machine, it defaults to the client."
+
+#define DEV_PATH_MAX_LEN 128
 
 enum subaction_type {
     SUBACTION_PAUSE,
@@ -99,7 +113,24 @@ enum subaction_type {
     SUBACTION_LOG,
     SUBACTION_LIST,
     SUBACTION_LS,
+    SUBACTION_ADD,
+    SUBACTION_RM,
+    SUBACTION_MOD,
     SUBACTION_COUNT,
+};
+
+union subaction_value {
+    uint16_arr dev_id_arr;
+    char_arr dev_name_arr;
+};
+
+struct subaction {
+    enum subaction_type type;
+    union subaction_value value;
+};
+
+struct arg_device {
+    char path[DEV_PATH_MAX_LEN];
 };
 
 struct arg_info {
@@ -113,7 +144,7 @@ union arg_data {
     enum event_types filter;
     int v_int;
     char* v_char;
-    char_arr v_char_arr;
+    dev_path_arr v_path_arr;
 };
 
 struct arg {

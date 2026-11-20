@@ -1,5 +1,6 @@
 #include "include/rcn.h"
 #include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,20 @@
 #include <unistd.h>
 
 /* u_misc */
+int u_str_to_ushort(char* str, uint16_t* val) {
+    CHECK(str[0] == '\0');
+    char* endptr = {};
+    unsigned long random_id_long = strtoul(str, &endptr, 10);
+    CHECK(endptr == str || endptr[0] != '\0');
+    CHECK(random_id_long == ULONG_MAX);
+    CHECK(random_id_long > UINT16_MAX);
+    *val = (uint16_t)random_id_long;
+    return 0;
+err:
+    ERR_LOG("");
+    return -1;
+}
+
 void u_safe_free(void** ptr) {
     free(*ptr);
     *ptr = NULL;
@@ -174,8 +189,6 @@ ssize_t u_array_find_index(struct u_array* arr, void* element) {
         if (memcmp(offset, element, arr->size) == 0)
             return (ssize_t)i;
     }
-    ERR_LOG("");
-    return -1;
 err:
     ERR_LOG("");
     return -1;
@@ -188,6 +201,15 @@ int u_array_free(struct u_array* arr) {
 err:
     ERR_LOG("");
     return -1;
+}
+
+/* This function maps a stream_item to a u_array, it doesn't allocate new memory, it just points into the buffer of the stream */
+int u_array_from_stream_shallow(struct u_array* arr, struct stream_item* stream_item, size_t size) {
+    arr->data = stream_item->payload.msg.buffer;
+    arr->size = size;
+    arr->length = stream_item->buffer_streamed / size;
+    arr->capacity = arr->length;
+    return 0;
 }
 
 /* u_queue */
