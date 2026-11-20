@@ -74,32 +74,18 @@ static void print_help() {
     printf("\n\t%s\t\t%s", ARG_SUBACTION_SWITCH, ARG_DESC_SUBACTION_SWITCH);
     printf("\n\t%s\t\t%s", ARG_SUBACTION_LOG, ARG_DESC_SUBACTION_LOG);
     printf("\n\t%s\t\t%s", ARG_SUBACTION_LIST, ARG_DESC_SUBACTION_LIST);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_ADD, ARG_DESC_SUBACTION_ADD);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_RM, ARG_DESC_SUBACTION_RM);
+    printf("\n\t%s\t\t%s", ARG_SUBACTION_MOD, ARG_DESC_SUBACTION_MOD);
     printf("\n\n");
 
     printf("Flags:\n");
     printf("\t%s/%s\t%s\n", ARG_FLAG_PORT, ARG_FLAG_LONG_PORT, ARG_DESC_FLAG_PORT);
-    printf("\t\t\tAvailable for actions:\n");
-    printf("\t\t\t\t%s, %s", ARG_ACTION_START, ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_CONNECT);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
-    printf("\t\t\tAvailable for action:\n");
-    printf("\t\t\t\t%s", ARG_ACTION_SHOW);
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
-    printf("\t\t\tPossible values are:\n");
-    printf("\t\t\t\t<(sub)action>");
-
-    printf("\n\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
-    printf("\t\t\tAvailability:\n");
-    printf("\t\t\t\tAlways");
+    printf("\t%s/%s\t%s\n", ARG_FLAG_HOST, ARG_FLAG_LONG_HOST, ARG_DESC_FLAG_HOST);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_DEVICES, ARG_FLAG_LONG_DEVICES, ARG_DESC_FLAG_DEVICES);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
+    printf("\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
     printf("\n");
 }
 

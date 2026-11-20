@@ -54,10 +54,10 @@
 #define ARG_FILTER_EVT_ABS      DEVICE_EVT_ABS_STR
 #define ARG_FILTER_EVT_SWT      DEVICE_EVT_SWT_STR
 
-#define ARG_DESC_FLAG_PORT      "Port on which to listen on/connect to"
-#define ARG_DESC_FLAG_HOST      "Hostname/ip-address of the server"
+#define ARG_DESC_FLAG_PORT      "Port to listen on/connect to"
+#define ARG_DESC_FLAG_HOST      "Hostname/IP-address of the server"
 #define ARG_DESC_FLAG_DEVICES   "List devices (event files) to capture, e.g. -d <evt1> <evt2> ..."
-#define ARG_DESC_FLAG_HELP      "Print the help for rcn, also a list of actions and subactions can be supplied for more detailed infos"
+#define ARG_DESC_FLAG_HELP      "Print the help for rcn. A list of (sub)actions can be supplied for more detailed infos"
 #define ARG_DESC_FLAG_DEBUG     "Print extra debug information in the log, should be the first argument"
 #define ARG_DESC_FLAG_FILTER    "Filter devices by event type"
 
@@ -89,10 +89,12 @@
 #define ARG_HELP_SUBACTION_LOG      "Print the logs of the daemon to stdout, includes errors and normal info.\n\t" \
                                     "If --debug is set, more info is available."
 #define ARG_HELP_SUBACTION_LIST     "List the captured devices and if they are grabbed or not. 'list' and 'ls' are the equivalent."
-#define ARG_HELP_SUBACTION_ADD      "Add the listed devices to the rcn context. The devices are instantly grabbed and inputs are streamed.\n\t" \
-                                    "The listed devices must be plugged into the client."
-#define ARG_HELP_SUBACTION_RM       "Remove all the listed from the rcn context. They are no longer captured."
-#define ARG_HELP_SUBACTION_MOD      "<TODO>."
+#define ARG_HELP_SUBACTION_ADD      "Add the listed devices to the rcn context. If the rcn context is not paused, the devices are instantly captured.\n\t" \
+                                    "rcn add -d /dev/input/eventX"
+#define ARG_HELP_SUBACTION_RM       "Remove the listed devices by ID from the rcn context. Use 'list' to see the ID.\n\t" \
+                                    "rcn rm -d <id>"
+#define ARG_HELP_SUBACTION_MOD      "Apply the 'switch' subaction to the listed devices, by ID. Use 'list' to see the ID.\n\t" \
+                                    "rcn mod -d <id>"
 
 #define ARG_HELP_RCN_DESC   "rcn is a tool to send inputs from eventX files and replay them on the server via a uinput virtual device.\n\t" \
                             "The server is started via 'start', the client connects via 'connect'\n\t" \

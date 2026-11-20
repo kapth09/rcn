@@ -232,3 +232,30 @@ rcn list
 ```bash
 rcn ls
 ```
+
+##### Add
+
+Add devices while already connected. Use the `-d/--device` flag and supply a list of `eventX` files.
+
+```Bash
+rcn add -d /dev/input/eventX ...
+```
+
+This currently only works from the client.
+
+##### Rm
+
+Remove devices while already connected. Use the `-d/--device` flag and supply a list of `ID`s. You get these IDs from running `rcn ls` 
+
+```bash
+rnc rm -d <id> ...
+```
+
+##### Mod
+
+Modify devices while already connected. This acts a `switch` action for specific devices. Use the `-d/--device` flag and supply a list of `ID`s. You get these IDs from running `rcn ls` 
+
+```bash
+rcn mod -d <id> ...
+```
+
