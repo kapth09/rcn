@@ -86,7 +86,6 @@ static void print_help() {
     printf("\t%s/%s\t%s\n", ARG_FLAG_FILTER, ARG_FLAG_LONG_FILTER, ARG_DESC_FLAG_FILTER);
     printf("\t%s/%s\t%s\n", ARG_FLAG_HELP, ARG_FLAG_LONG_HELP, ARG_DESC_FLAG_HELP);
     printf("\t%s/%s\t%s\n", ARG_FLAG_DEBUG, ARG_FLAG_LONG_DEBUG, ARG_DESC_FLAG_DEBUG);
-    printf("\n");
 }
 
 static int handle_arg(int argc, char** argv, int* i, struct arg_context* arg_ctx) {
