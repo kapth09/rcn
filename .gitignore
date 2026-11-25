@@ -1,2 +1,5 @@
 .idea
 package/release/
+package/rhel/
+package/debian/
+package/arch/
