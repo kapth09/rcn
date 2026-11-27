@@ -1,16 +1,23 @@
 # RCN
 
-[TOC]
-
-## About
-
-A remote control program for Linux to read input data from `eventX` files of the `client` and replay them on the `server`.
-
 > [!WARNING]
 >
 > The network traffic is not encrypted and somebody could spy on your inputs.\
 > This includes keystrokes, making it possible to capture passwords and such.
 
+---
+
+A remote control program for Linux to read input data from `eventX` files of the `client` and replay them on the `server`.
+
+<p align="center">
+    <a href="#installation">Installation</a> - 
+    <a href="#quick-start-guide">Quick start</a> - 
+    <a href="docs/USAGE.md">Documentation</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/kapth09/rcn/releases"><img src="https://img.shields.io/github/downloads/kapth09/rcn/total?color=1f293b" alt="Downloads"></a>
+</p>
 </br>
 
 ## Installation
