@@ -2,8 +2,6 @@
 
 RCN is a remote control program for any Linux based operating system written in C. It allows the user to capture the inputs from one device (the client) and replay them on another computer (the server).
 
-[TOC]
-
 ## Tested devices
 
 A list of every tested device and proven to work:
